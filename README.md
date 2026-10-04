@@ -34,8 +34,8 @@ enables the mod in the game and allows it in a permission prompt (after restart)
 
 **Native mods screen.** The main menu gets a **Native mods** button on the bottom right, above "Send Feedback". There you'll see all the mods registered with the Modloader; they each have their own tab with settings (if they have any settings to change). 
 
-## MODS MENU CHANGES
-The game applies Mods menu changes without restarting, but mod code can only load when the game starts. So:
+## GAME'S MOD MENU CHANGES
+The game applies changes from the normal "Mods menu" without (actually) restarting, but mod code coming from a DLL can only load when the game starts. So:
 - A native mod you disable is switched off right away. Its code stays in memory doing nothing until you quit.
 - A native mod you enable starts working the next time you start the game.
 
