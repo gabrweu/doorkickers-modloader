@@ -1,6 +1,5 @@
-# Developer install: copies the freshly built loader (build\dk2ml.dll and the build\dbghelp.dll stub that loads it) into
-# the game folder. Plugins install from their own repos.
-# Players copy both DLLs from the release zip instead.
+# Dev install: copies build\dk2ml.dll and the build\dbghelp.dll stub into the game folder. Plugins install from their
+# own repos; players copy both DLLs from the release zip.
 # Uninstall: .\tools\install.ps1 -Uninstall   (or delete dbghelp.dll and dk2ml.dll from the game folder)
 param(
     [string]$GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\DoorKickers2',

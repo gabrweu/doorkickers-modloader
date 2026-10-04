@@ -1,9 +1,7 @@
-// The "Native mods" screen at runtime: the pages it shows (built from the loader's records at each GUI load, see
-// NativeModsScreenXml.cpp) and what the player does on it.
+// The "Native mods" screen at runtime: its pages and the player's input.
 //
-// Every click and change arrives as event 219 (see GuiKit.cpp) in Screen_OnGameEvent; its iParam says which widget
-// and what happened. Widgets are found by name (#dk2ml_w<N>) when the screen opens, then read and written with the
-// game's own functions.
+// Clicks and changes arrive as event 219 in Screen_OnGameEvent (iParam: widget and action). Widgets are found by name
+// (#dk2ml_w<N>) when the screen opens.
 #include "NativeModsScreen.h"
 
 #include <shellapi.h>
@@ -52,7 +50,7 @@ std::string U8(const std::wstring& w)
     return s;
 }
 
-// Mod text shown through ChangeText: no leading '@' (it would be looked up as a game text).
+// No leading '@': ChangeText would look it up as a game text.
 std::string Plain(const std::string& s)
 {
     size_t i = 0;
@@ -82,7 +80,7 @@ constexpr char kRestartNote[] = "Restart the game to apply your native mod chang
 
 std::string StatusText(const ModEntry& e)
 {
-    // disabled in the Mods menu with no code running; no further detail
+    // disabled in the Mods menu, no code running
     if (!e.enabledNow && e.modules.empty()) {
         return "Not loaded: disabled in the Mods menu";
     }
@@ -235,7 +233,7 @@ bool ClashesWith(const OptionEntry* other, const OptionEntry* o, int vk)
     return other->api.type == DK2ML_OPTION_KEY && other->api.value && *static_cast<int*>(other->api.value) == vk;
 }
 
-// Other plugins' key options bound to the same key. Both mods react to that key, so the button names the others.
+// Other plugins' KEY options on the same key; the button names their mods.
 std::string KeyClash(const OptionEntry* o)
 {
     int vk = *static_cast<int*>(o->api.value);
@@ -256,7 +254,7 @@ std::string KeyClash(const OptionEntry* o)
     return others;
 }
 
-// A KEY option's button text: the key, and the other mods bound to it.
+// A KEY option's button text: the key and other mods bound to it.
 std::string KeyText(const OptionEntry* o)
 {
     std::string clash = KeyClash(o);
@@ -342,9 +340,8 @@ void RefreshStatus(int page)
     SetText(ok ? g_statusOk[page] : g_statusBad[page], Plain(StatusText(e)));
 }
 
-// clicked: the list entry whose click this is, or -1. Entries are radio checkboxes, and a click event runs before the
-// checkbox flips. So the clicked entry is left alone, because setting it here would be flipped right back. The others
-// are unchecked here in case autoSiblingsUncheck missed one.
+// clicked: the clicked list entry, or -1. Its click event runs before it flips, so setting it here would be flipped
+// back: it's left alone. The others are unchecked in case autoSiblingsUncheck missed one.
 void ShowPage(int page, int clicked = -1)
 {
     g_selected = page;
@@ -360,7 +357,7 @@ void ShowPage(int page, int clicked = -1)
     }
 }
 
-// Logs an OnOpen slower than 100 ms when it goes out of scope.
+// Logs OnOpen above 100 ms.
 struct OpenTimer {
     ULONGLONG started;
 
@@ -375,7 +372,7 @@ struct OpenTimer {
 
 void OnOpen()
 {
-    // Runs on the main thread, so anything slow here freezes the game before the screen shows.
+    // Main thread: anything slow here freezes the game before the screen shows.
     OpenTimer timer = {GetTickCount64()};
 
     void* manager = *globals.guiManager;
@@ -412,7 +409,7 @@ void OnOpen()
 
 void Open(const std::wstring& target)
 {
-    // only ever loader-known folders/files and the fixed Workshop URL with a numeric id
+    // only loader-known paths and the fixed Workshop URL with a numeric id
     ShellExecuteW(nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
@@ -457,7 +454,7 @@ void StartCapture(int n)
     SetButtonText(g_widgetItems[n], "Press a key (Esc cancels)");
 }
 
-// A slider moved: stores its value (an INT option's rounded) if that changed.
+// Stores the value (INT: rounded) if it changed.
 void OnSliderMove(int n, OptionEntry* o, int page, void* item)
 {
     float v = fn.SliderGetValue(item);
@@ -478,7 +475,7 @@ void OnSliderMove(int n, OptionEntry* o, int page, void* item)
     NotifyChange(o, page);
 }
 
-// A selector arrow: the next or previous choice, wrapping around; an out-of-range value counts as the first.
+// Next/previous choice, wrapping; an out-of-range value counts as the first.
 void StepChoice(OptionEntry* o, bool forward)
 {
     int count = static_cast<int>(o->choices.size());
@@ -583,7 +580,7 @@ bool GameFocused()
     return pid == GetCurrentProcessId();
 }
 
-// Left/right Shift, Ctrl and Alt are stored as the plain key, which either side presses.
+// Left/right Shift, Ctrl, Alt are stored as the plain key, which either side presses.
 int GenericModifier(int vk)
 {
     switch (vk) {
@@ -611,7 +608,6 @@ std::wstring JoinNames(const std::vector<std::wstring>& names)
     return joined;
 }
 
-// the loader's own page
 sx::Page LoaderPage()
 {
     sx::Page loader;
@@ -634,7 +630,7 @@ sx::Page LoaderPage()
     return loader;
 }
 
-// One line: where it's from, then its code (the status goes to the right of it).
+// Where it's from, then its code (the status sits to its right).
 std::string SourceLine(const ModEntry& e)
 {
     std::string from;
@@ -657,7 +653,6 @@ std::string SourceLine(const ModEntry& e)
     return line;
 }
 
-// What each plugin says about itself (its manifest, read from the file).
 void AddManifestLines(const ModEntry& e, sx::Page& page)
 {
     for (size_t k = 0; k < e.manifests.size() && k < e.dllNames.size(); ++k) {
@@ -679,7 +674,7 @@ void AddManifestLines(const ModEntry& e, sx::Page& page)
     }
 }
 
-// The first three names this game build lacks, and how many more the log has.
+// The first three missing names, and how many more the log has.
 std::string MissingNames(const ModEntry& e)
 {
     std::string list;
@@ -695,7 +690,7 @@ std::string MissingNames(const ModEntry& e)
     return list;
 }
 
-// The settings the mod's plugins declared, unless they were switched off.
+// Declared settings, unless switched off.
 void AddModOptions(const ModEntry& e, sx::Page& page, PageInfo& info)
 {
     for (OptionEntry* o : Plugins_Options()) {
@@ -726,18 +721,17 @@ sx::Page ModPage(const ModEntry& e, PageInfo& info)
     page.lines.push_back(SourceLine(e));
     AddManifestLines(e, page);
 
-    // after a game update, missing names are the usual reason a plugin didn't start; players pass them on
+    // after a game update, the usual reason a plugin didn't start; players pass these on
     if (e.status != ModStatus::Loaded && !e.missing.empty()) {
         page.warnLines.push_back("Not in this game version: " + MissingNames(e));
     }
-    // problems with other mods the loader can see (shared DLL names)
+    // clashes with other mods (shared DLL names)
     for (const auto& c : e.conflicts) {
         page.warnLines.push_back(c);
     }
 
     page.hasStatus = true;
-    // Dimmed in the list when not running, with the reason as its tooltip. Both are set at GUI load, so a later
-    // crash shows on the page's status line at once and in the list at the next GUI load.
+    // Not running: dimmed, reason as tooltip. Set at GUI load: a later crash shows on the status line first.
     page.dimmed = e.status != ModStatus::Loaded;
     if (page.dimmed) {
         page.tooltip = StatusText(e);
@@ -815,8 +809,8 @@ void Screen_Tick()
         return;
     }
 
-    // Mouse buttons count too, except left and right (the click that started capturing, and the game's main
-    // buttons): start at VK_MBUTTON (4), past VK_LBUTTON/VK_RBUTTON/VK_CANCEL, and skip the unassigned 0x07.
+    // Mouse buttons count, except left/right (the capturing click; the game's main buttons): start at VK_MBUTTON (4),
+    // past VK_LBUTTON/VK_RBUTTON/VK_CANCEL; skip unassigned 0x07.
     for (int vk = VK_MBUTTON; vk < 0xFF; ++vk) {
         if (vk == 0x07) {
             continue;
@@ -826,7 +820,7 @@ void Screen_Tick()
             g_keysHeldAtStart[vk] = false;
             continue;
         }
-        // the plain Shift/Ctrl/Alt codes are down along with their left/right codes, which come later in the loop
+        // plain Shift/Ctrl/Alt are down along with their left/right codes, which come later
         bool plainModifier = vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU;
         if (g_keysHeldAtStart[vk] || plainModifier) {
             continue;

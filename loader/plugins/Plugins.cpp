@@ -1,4 +1,4 @@
-// Finds plugin DLLs in enabled mods (options.xml <Mods pathN="...">) and <game>\mods_native\, and loads them.
+// Finds and loads plugin DLLs from enabled mods and <game>\mods_native\.
 #include "Loader.h"
 
 #include <intrin.h>
@@ -70,8 +70,7 @@ constexpr size_t kModsTagLength = sizeof(kModsTag) - 1;
 constexpr char kPathAttribute[] = "path"; // path0, path1, ...
 constexpr size_t kPathAttributeLength = sizeof(kPathAttribute) - 1;
 
-// Where the attributes of options.xml's <Mods> tag start, or npos. Scanned by hand: MSVC's std::regex recurses per
-// character, and this tag gets long with many mods enabled.
+// Start of <Mods>'s attributes, or npos. Hand-scanned: MSVC's std::regex recurses per character.
 size_t FindModsAttributes(const std::string& xml)
 {
     for (size_t at = xml.find(kModsTag); at != std::string::npos; at = xml.find(kModsTag, at + 1)) {
@@ -85,7 +84,7 @@ size_t FindModsAttributes(const std::string& xml)
     return std::string::npos;
 }
 
-// Mod folders listed in options.xml, in the game's load order.
+// options.xml's mod folders, in load order.
 std::vector<std::wstring> EnabledModDirs()
 {
     std::vector<std::wstring> dirs;
@@ -153,7 +152,7 @@ std::vector<std::wstring> DllsIn(const std::wstring& dir)
     return dlls;
 }
 
-// manifests: one per plugin, in the same order
+// manifests parallel to plugins
 void SplitDlls(const std::wstring& dir, std::vector<std::wstring>* plugins, std::vector<std::wstring>* support,
                std::vector<PluginManifest>* manifests)
 {
@@ -186,12 +185,11 @@ std::string NarrowName(HMODULE module)
     return ToUtf8(ModuleFileName(module));
 }
 
-// --- the menu's records: every enabled mod with native code, and the options plugins declared ---
+// --- the menu's records ---
 
 std::vector<ModEntry> g_mods;
 std::vector<OptionEntry*> g_options; // never freed: onChange gets pointers into them
-// AddOption works only while plugins initialize, so the list doesn't change after that and the screen reads it without
-// a lock. The lock covers threads a plugin starts in its init, and FaultOptionsOf from a hook on another thread.
+// Written only during init; the screen reads it lock-free. The lock is for plugin threads and FaultOptionsOf.
 SRWLOCK g_optionsLock = SRWLOCK_INIT;
 bool g_optionsOpen = false;
 
@@ -209,7 +207,6 @@ ModEntry* EntryOf(HMODULE module)
     return nullptr;
 }
 
-// the menu's record of the mod the module came from
 void MarkStatus(HMODULE module, ModStatus status)
 {
     if (ModEntry* e = EntryOf(module)) {
@@ -217,7 +214,6 @@ void MarkStatus(HMODULE module, ModStatus status)
     }
 }
 
-// no more option callbacks into it
 void FaultOptionsOf(HMODULE owner)
 {
     AcquireSRWLockShared(&g_optionsLock);
@@ -229,20 +225,18 @@ void FaultOptionsOf(HMODULE owner)
     ReleaseSRWLockShared(&g_optionsLock);
 }
 
-// --- hooks, by owning plugin, so a plugin that fails can be switched off as a whole ---
+// --- hooks by owner, so a failing plugin is switched off as a whole ---
 
 void DisableHooksOf(HMODULE owner)
 {
-    // Its safe hooks pass through right away, even mid-call. Other plugins' hooks on the same functions keep running.
+    // even mid-call; other owners' callbacks keep running
     SafeHook_FaultOwner(owner);
     Events_FaultOwner(owner);      // its events and waiting tasks
-    Interfaces_FaultOwner(owner);  // its tables point into code that is switched off
-    Gui_FaultOwner(owner);         // its GUI callbacks do nothing, its input capture is released
+    Interfaces_FaultOwner(owner);  // its tables point into switched-off code
+    Gui_FaultOwner(owner);         // GUI callbacks inert, input capture released
 }
 
-// Plugins switched off for the rest of the session: a crash, a failed init, or their mod disabled in the Mods menu.
-// A thread of theirs may still run and call the API, so CreateSafeHook and EnableHook refuse them. Events, Interfaces
-// and GuiThunks keep their own records of the same thing.
+// Switched off for the session. Their threads may still call the API, so CreateSafeHook and EnableHook refuse them.
 SRWLOCK g_offLock = SRWLOCK_INIT;
 std::vector<HMODULE> g_switchedOff;
 
@@ -280,7 +274,7 @@ void OnSafeHookFault(HMODULE owner, DWORD, void*)
     MarkStatus(owner, ModStatus::Crashed);
 }
 
-// Events.cpp or GuiThunks.cpp already logged the crash and stopped the plugin's events or GUI callbacks
+// Events.cpp or GuiThunks.cpp already logged it
 void OnEventCrash(HMODULE owner)
 {
     LogF("%ls was switched off for this session (the game continues without it)", ModuleFileName(owner).c_str());
@@ -288,9 +282,9 @@ void OnEventCrash(HMODULE owner)
     MarkStatus(owner, ModStatus::Crashed);
 }
 
-// --- names a plugin looked up that this game build doesn't have: after a game update, the reason its init fails ---
+// --- names a plugin looked up that this build lacks ---
 
-constexpr size_t kMaxMissingPerPlugin = 32; // a plugin probing names in a loop mustn't grow this without end
+constexpr size_t kMaxMissingPerPlugin = 32; // bounds a plugin probing names in a loop
 SRWLOCK g_missingLock = SRWLOCK_INIT;
 std::vector<std::pair<HMODULE, std::string>> g_missing;
 
@@ -335,7 +329,7 @@ std::string JoinNames(const std::vector<std::string>& names)
 
 // --- API exposed to plugins ---
 
-constexpr size_t kMaxLookupName = 256; // a name a plugin looked up is kept up to this many bytes
+constexpr size_t kMaxLookupName = 256; // bytes kept of a looked-up name
 
 std::string Name(const char* s)
 {
@@ -374,8 +368,7 @@ __declspec(noinline) uint32_t Api_GetTypeSize(const char* typeName)
     return size;
 }
 
-// These switch only the calling plugin's callbacks on the function. A target without a safe hook is refused, so a
-// plugin can't toggle the loader's own MinHook hooks.
+// Only the caller's callbacks. No safe hook on the target: refused, so plugins can't toggle the loader's hooks.
 DK2ML_Status SetHookEnabled(HMODULE owner, void* target, bool enable)
 {
     int r = SafeHook_SetEnabled(target, owner, enable);
@@ -402,7 +395,6 @@ __declspec(noinline) DK2ML_Status Api_DisableHook(void* target)
 
 __declspec(noinline) void Api_Log(const char* fmt, ...)
 {
-    // prefix with the calling plugin's file name
     char prefix[MAX_PATH] = "plugin";
     if (HMODULE caller = ModuleAt(_ReturnAddress())) {
         char path[MAX_PATH];
@@ -474,12 +466,11 @@ std::wstring MakeConfigDir(HMODULE caller)
     return dir;
 }
 
-// Per-plugin settings folder outside the mod folder, which Steam replaces on every Workshop update:
-// %LOCALAPPDATA%\KillHouseGames\DoorKickers2\dk2ml\<plugin dll name>\. Named after the calling DLL.
+// Outside the mod folder, which Steam replaces on every Workshop update.
 __declspec(noinline) const wchar_t* Api_GetConfigDir()
 {
     static SRWLOCK lock = SRWLOCK_INIT;
-    static std::vector<std::pair<HMODULE, std::wstring>> dirs; // the strings live for the process lifetime
+    static std::vector<std::pair<HMODULE, std::wstring>> dirs; // never freed
     HMODULE caller = ModuleAt(_ReturnAddress());
 
     AcquireSRWLockExclusive(&lock);
@@ -496,7 +487,6 @@ __declspec(noinline) const wchar_t* Api_GetConfigDir()
     return result;
 }
 
-// Shown on the plugin's page of the "Native mods" screen, built when the game loads its GUI.
 __declspec(noinline) DK2ML_Status Api_AddOption(const DK2ML_Option* plugin)
 {
     HMODULE owner = ModuleAt(_ReturnAddress());
@@ -512,7 +502,7 @@ __declspec(noinline) DK2ML_Status Api_AddOption(const DK2ML_Option* plugin)
         return DK2ML_ERROR;
     }
 
-    // the loader's own copy of the texts, so the plugin's strings needn't outlive the call
+    // copies: the plugin's strings needn't outlive the call
     const DK2ML_Option* option = &copy;
     auto* o = new OptionEntry{owner, Copy(option->label), Copy(option->tooltip), Copy(option->format), {}, {}, *option,
                               false};
@@ -563,7 +553,7 @@ __declspec(noinline) DK2ML_Status Api_AddTask(DK2ML_TaskFn fn, void* user)
     return Events_AddTask(ModuleAt(_ReturnAddress()), fn, user);
 }
 
-// the GUI kit: GuiKit.cpp (only GuiSetCallback needs to know whose callback it is)
+// the GUI kit is in GuiKit.cpp; only GuiSetCallback needs the owner
 __declspec(noinline) DK2ML_Status Api_GuiSetCallback(void* item, int itemEvent, DK2ML_GuiCallbackFn fn, void* user)
 {
     return Gui_SetCallback(ModuleAt(_ReturnAddress()), item, itemEvent, fn, user);
@@ -594,7 +584,7 @@ void* Api_GetGameWindow()
     return GuiKit_GameWindow();
 }
 
-// positional: a field appended to DK2ML_API without an entry here would be NULL for every plugin
+// positional: a new DK2ML_API field without an entry here would be NULL
 static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, IsGameMenuOpen) + sizeof(void*),
               "DK2ML_API grew: add the new fields");
 const DK2ML_API g_api = {
@@ -645,7 +635,7 @@ struct Candidate {
     PluginManifest manifest;
 };
 
-// Keeps the strings handed to plugins alive for the process lifetime.
+// Strings handed to plugins; never freed.
 struct LoadedPlugin {
     std::wstring path;
     std::wstring dir;
@@ -667,7 +657,6 @@ int CallInit(DK2ML_PluginInitFn init, const DK2ML_PluginInfo* info, DWORD* code)
     }
 }
 
-// " (text)", or "" for no text
 std::string InParentheses(const std::string& text)
 {
     return text.empty() ? std::string() : " (" + text + ")";
@@ -675,8 +664,7 @@ std::string InParentheses(const std::string& text)
 
 ModStatus LoadPlugin(const Candidate& c, HMODULE* loaded)
 {
-    // The plugin's DllMain runs inside LoadLibraryExW, uncontained. If it crashes, this is the last line in dk2ml.log
-    // and names the plugin.
+    // DllMain runs uncontained inside LoadLibraryExW; if it crashes, this is the log's last line.
     LogF("loading %ls", c.path.c_str());
     HMODULE mod =
         LoadLibraryExW(c.path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
@@ -706,7 +694,7 @@ ModStatus LoadPlugin(const Candidate& c, HMODULE* loaded)
     }
 
     if (result == kInitCrashed) {
-        // not unloaded, because it may have started threads or hooks; it's switched off instead
+        // not unloaded: it may have started threads or hooks
         LogF("%ls crashed during init (exception 0x%08lX); its hooks are switched off", c.path.c_str(), code);
         SwitchOff(mod);
         return ModStatus::Crashed;
@@ -727,9 +715,8 @@ std::string AlsoShippedBy(const std::wstring& dll, const std::wstring& otherTitl
     return ToUtf8(dll) + " is also shipped by " + ToUtf8(otherTitle) + " in another version: only one is used";
 }
 
-// Before any plugin loads: finds dependency DLLs that two mods ship under one name with different contents, or that
-// the game already has loaded. Windows loads a DLL name once per process, so one plugin silently gets the other copy.
-// That can cause a version mismatch or a crash that is hard to trace.
+// Dependency DLLs two mods ship under one name with different contents, or that the game already loaded. Windows
+// loads a DLL name once per process, so one plugin gets the other's copy.
 void CheckSupportDlls()
 {
     std::vector<SupportDll> dlls;
@@ -773,7 +760,6 @@ std::vector<std::wstring> FileNames(const std::vector<std::wstring>& paths)
     return names;
 }
 
-// A mod with native code, as the screen lists it
 ModEntry NewEntry(const std::wstring& title, const std::wstring& dir, ModSource source, bool gameNativeFolder,
                   const std::vector<std::wstring>& plugins, const std::vector<std::wstring>& support,
                   const std::vector<PluginManifest>& manifests, ModStatus status)
@@ -796,23 +782,23 @@ ModEntry NewEntry(const std::wstring& title, const std::wstring& dir, ModSource 
     return e;
 }
 
-// --- the Mods menu during a session: the game applies its changes without restarting (Plugins_SyncEnabled) ---
+// --- the Mods menu during a session (Plugins_SyncEnabled) ---
 
 bool g_syncOn = false;       // Plugins_LoadAll ran
 bool g_listFromFile = false; // the last sync re-read options.xml
 
 std::wstring g_workshopRoot;
 std::vector<std::wstring> g_localRoots;
-// every mod folder looked at, by Consent_ModListKey, native code or not: a GUI reload doesn't scan them again
+// every mod folder seen (Consent_ModListKey): never scanned again
 std::vector<std::wstring> g_seenKeys;
 
-// The game's active mod folders now: the game's own list, or options.xml without it.
+// the game's list, or options.xml without it
 std::vector<std::wstring> CurrentModList(const std::vector<std::string>* gameList)
 {
     std::vector<std::wstring> now;
     if (gameList) {
         for (const auto& raw : *gameList) {
-            now.push_back(Utf8ToWide(raw)); // the same bytes options.xml gets, read the same way
+            now.push_back(Utf8ToWide(raw)); // the same bytes options.xml gets
         }
     } else {
         now = EnabledModDirs();
@@ -828,13 +814,13 @@ std::vector<std::wstring> CurrentModList(const std::vector<std::string>* gameLis
     return now;
 }
 
-// A folder the loader hasn't looked at: a mod enabled since the start, or one already known under another spelling.
+// A folder not looked at yet: enabled since the start, or a known mod under another spelling.
 // knownMods: g_mods indexes, parallel to diff->active.
 void OnModListed(const std::wstring& listed, const std::vector<size_t>& knownMods, EnabledDiff* diff)
 {
     std::wstring key = Consent_ModListKey(listed);
     if (std::find(g_seenKeys.begin(), g_seenKeys.end(), key) != g_seenKeys.end()) {
-        return; // enabled at the start without native code (or unresolvable): nothing to load either way
+        return; // seen at the start: no native code, or unresolvable
     }
     g_seenKeys.push_back(key);
     std::wstring modDir = Consent_Canonical(listed);
@@ -856,7 +842,7 @@ void OnModListed(const std::wstring& listed, const std::vector<size_t>& knownMod
 
     std::vector<std::wstring> plugins, support;
     std::vector<PluginManifest> manifests;
-    SplitDlls(modDir + L"native\\", &plugins, &support, &manifests); // mapped as data: nothing of it runs
+    SplitDlls(modDir + L"native\\", &plugins, &support, &manifests); // mapped as data
     if (plugins.empty()) {
         return;
     }
@@ -878,7 +864,6 @@ void OnModListed(const std::wstring& listed, const std::vector<size_t>& knownMod
          e.title.c_str());
 }
 
-// A known mod, still in the game's list (active) or not.
 void OnModListState(ModEntry& e, bool active)
 {
     if (active) {
@@ -892,7 +877,7 @@ void OnModListState(ModEntry& e, bool active)
         return;
     }
 
-    // only a mod the game has listed can have left the list: before that, the list may just not be filled yet
+    // only a mod the game has listed can leave: the list may not be filled yet
     if (!e.seenInGame || !e.enabledNow) {
         return;
     }
@@ -903,7 +888,7 @@ void OnModListState(ModEntry& e, bool active)
         return;
     }
 
-    // switched off now, because the game is dropping the mod's GUI files and data in this load
+    // now: the game drops the mod's GUI files and data in this load
     for (HMODULE m : e.modules) {
         SwitchOff(m);
     }
@@ -921,14 +906,13 @@ bool NeedsRestart(const ModEntry& e)
 
 // --- startup: Plugins_LoadAll's steps, in order ---
 
-// A mod's plugins; whether they load is decided once the Workshop items are answered.
+// A mod's plugins; loading waits for the Workshop answers.
 struct Found {
     size_t entry;
     std::vector<std::wstring> plugins;
     std::vector<PluginManifest> manifests;
 };
 
-// What the startup steps share.
 struct Startup {
     std::wstring nativeRoot;              // <game>\mods_native\, canonical ("" if it doesn't exist)
     std::vector<std::wstring> localRoots; // the player's own mod folders, canonical
@@ -938,7 +922,7 @@ struct Startup {
     std::vector<size_t> workshopEntries;  // their g_mods indexes
 };
 
-// Room g_mods keeps for mods enabled in the Mods menu after the start (Plugins_SyncEnabled appends them).
+// Room in g_mods for mods enabled after the start.
 constexpr size_t kModsEnabledLater = 64;
 
 void SetLoaderCallbacks()
@@ -946,11 +930,10 @@ void SetLoaderCallbacks()
     SafeHook_SetFaultCallback(OnSafeHookFault);
     SafeHook_SetTargetNamer(Symbols_NameAt);
     Events_SetCrashCallback(OnEventCrash);
-    Gui_SetCrashCallback(OnEventCrash); // GuiThunks.cpp logged it and stopped its callbacks
+    Gui_SetCrashCallback(OnEventCrash); // GuiThunks.cpp already logged it
 }
 
-// Only the player's own mod folders load without asking. Paths are compared after resolving links, so a junction can't
-// make some other folder look local.
+// Only the player's own mod folders load without asking. Compared after resolving links: a junction can't fake local.
 void FindRoots(const std::wstring& gameDir, const std::wstring& save, Startup* s)
 {
     s->nativeRoot = Consent_Canonical(gameDir + L"mods_native\\");
@@ -990,7 +973,6 @@ void ScanGameNativeFolder(Startup* s)
     }
 }
 
-// A listed mod's status before the Workshop prompt, by where its folder is.
 ModStatus StatusBeforeConsent(ModSource source)
 {
     if (source == ModSource::Local) {
@@ -1012,7 +994,7 @@ void ScanListedMods(const std::vector<std::wstring>& enabled, Startup* s)
             continue;
         }
 
-        // read as data (nothing runs): which DLLs are plugins
+        // mapped as data: nothing runs
         std::vector<std::wstring> plugins, support;
         std::vector<PluginManifest> manifests;
         SplitDlls(modDir + L"native\\", &plugins, &support, &manifests);
@@ -1055,7 +1037,7 @@ ModStatus StatusAfterConsent(bool load, const ConsentRequest& request)
     return ModStatus::Declined;
 }
 
-// Workshop items update by themselves: their code loads with the player's permission for this version
+// Workshop code loads only with the player's permission (Consent.cpp)
 void DecideWorkshop(bool allowWorkshop, const std::wstring& ini, Startup* s)
 {
     if (allowWorkshop) {
@@ -1099,12 +1081,11 @@ std::vector<Candidate> BuildCandidates(const std::vector<Found>& found)
 void SetRegistrationOpen(bool open)
 {
     g_optionsOpen = open;
-    Events_SetOpen(open);     // subscriptions, like options, only while plugins initialize
-    Interfaces_SetOpen(open); // published only now and looked up only after, so lookups don't depend on load order
+    Events_SetOpen(open);     // subscriptions, like options, only during init
+    Interfaces_SetOpen(open); // published only now, looked up only after
 }
 
-// One copy per plugin file name: two enabled mods with the same plugin (e.g. a local working copy and the Workshop
-// item) would hook everything twice and share one settings folder (GetConfigDir is named after the DLL).
+// One copy per plugin file name: a duplicate would hook everything twice and share one GetConfigDir.
 void LoadCandidates(const std::vector<Candidate>& candidates)
 {
     std::vector<std::pair<std::wstring, size_t>> loadedNames; // lowercase file name, g_mods index
@@ -1123,7 +1104,7 @@ void LoadCandidates(const std::vector<Candidate>& candidates)
             continue;
         }
         if (c.manifest.minApiVersion > DK2ML_API_VERSION) {
-            // the manifest was read from the file, so none of the plugin's code has run
+            // read from the file: none of its code has run
             entry.status = ModStatus::NeedsNewerLoader;
             entry.neededApi = c.manifest.minApiVersion;
             LogF("not loading %ls: it needs plugin API %u, this loader is %s with API %d", c.path.c_str(),
@@ -1168,8 +1149,7 @@ std::string OwnerList(const std::vector<HMODULE>& owners, HMODULE self)
     return list;
 }
 
-// "" unless the linker folded other functions into this one: the plugins may have asked for different names, and each
-// one's hook runs for all of them
+// "" unless ICF folded other functions into this one: each plugin's hook runs for all of them
 std::string FoldedNote(const std::vector<std::string>& names)
 {
     if (names.size() <= 1) {
@@ -1213,8 +1193,7 @@ std::wstring Plugins_SaveDir()
 
 void Plugins_LogSharedHooks()
 {
-    // Plugins don't see each other's hooks, so the log records the chain order of every shared function. It also
-    // shows whose pre could skip the others.
+    // plugins can't see each other's hooks, so log every shared chain's order
     HMODULE self = ModuleAt(reinterpret_cast<void*>(&Plugins_LogSharedHooks));
     for (const auto& chain : SafeHook_Chains()) {
         if (chain.owners.size() < 2) {
@@ -1230,7 +1209,7 @@ void Plugins_LogSharedHooks()
     }
 }
 
-// --- the crash report's view of the mods (CrashReport.cpp): runs in a dying process, so no allocation ---
+// --- the crash report's view of the mods: a dying process, so no allocation ---
 
 namespace {
 
@@ -1261,7 +1240,6 @@ const char* StatusName(ModStatus status)
     return "?";
 }
 
-// separator, or "" before an empty text
 const char* SeparatorBefore(const std::string& text, const char* separator)
 {
     return text.empty() ? "" : separator;
@@ -1281,7 +1259,7 @@ void ManifestInto(const PluginManifest& m, char* out, size_t size)
 
 bool Plugins_CrashOwner(uintptr_t address, char* out, size_t size)
 {
-    // by file: a plugin or a DLL it ships (both load from the mod's code folder)
+    // by file under the mod's code folder: a plugin or a DLL it ships
     void* base = nullptr;
     if (!RtlPcToFileHeader(reinterpret_cast<void*>(address), &base) || !base) {
         return false;
@@ -1355,8 +1333,7 @@ void Plugins_LoadAll(const std::wstring& gameDir)
     Startup startup;
     FindRoots(gameDir, save, &startup);
 
-    // The crash report reads g_mods from any thread, so it must never reallocate: room for every listed mod, the
-    // mods_native entry and the mods enabled later.
+    // The crash report reads g_mods from any thread, so it never reallocates: listed + mods_native + later ones.
     std::vector<std::wstring> enabled = EnabledModDirs();
     g_mods.reserve(enabled.size() + 1 + kModsEnabledLater);
 

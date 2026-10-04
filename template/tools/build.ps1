@@ -1,5 +1,5 @@
-# Builds the plugin DLL (MSVC x64) into build\. -Config picks the CMake build type (default Release; build Release for
-# the Workshop). Needs Visual Studio 2022 or its Build Tools with the C++ workload (MSVC, CMake, Ninja).
+# Builds the plugin DLL (MSVC x64) into build\. -Config: CMake build type (default Release, the one for the Workshop).
+# Needs Visual Studio 2022 or its Build Tools with the C++ workload (MSVC, CMake, Ninja).
 param([string]$Config = 'Release')
 
 $ErrorActionPreference = 'Stop'

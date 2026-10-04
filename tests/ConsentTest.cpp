@@ -1,7 +1,5 @@
-// Checks loader/safety/Consent.cpp with a scripted prompt instead of the dialog: folder classification, mod titles,
-// the Mods-menu diff, fingerprints, remembered answers, one prompt for every new or changed item, plugin and manifest
-// detection, dependency DLL clashes.
-// usage: consenttest.exe   (prints "all passed", exit code 0)
+// loader/safety/Consent.cpp with a scripted prompt instead of the dialog: folder classification, mod titles, the
+// Mods-menu diff, fingerprints, remembered answers, one prompt per batch, plugin/manifest detection, DLL clashes.
 #include "../loader/Loader.h"
 
 #include <shellapi.h>
@@ -67,7 +65,7 @@ void DeleteTree(const std::wstring& dir)
     SHFileOperationW(&op);
 }
 
-// the test's folders: a fake Workshop item with a native\ folder, and the ini next to it
+// a fake Workshop item with a native\ folder, and the ini next to it
 struct Paths {
     std::wstring base;
     std::wstring mod;
@@ -109,7 +107,7 @@ void TestIniAndTitles(const Paths& p)
     WriteFile(titled + L"mod.xml", "<Mod subtitle=\"no\" data-title=\"no\" title = \"Spaced &amp; fine\"/>");
     Expect("mod title: only the title attribute, spaces allowed", Consent_ModTitle(titled) == L"Spaced & fine");
 
-    // the game writes titles with entities: the Workshop Free Camera's mod.xml says title="Era&apos;s Free Camera"
+    // the game writes entities: the Workshop Free Camera's mod.xml has title="Era&apos;s Free Camera"
     WriteFile(titled + L"mod.xml", "<Mod title=\"Era&apos;s Free Camera\"/>");
     Expect("mod title: entities are decoded", Consent_ModTitle(titled) == L"Era's Free Camera");
     WriteFile(titled + L"mod.xml", "<Mod title=\"A&#39;b &#x2019; &amp;apos; &bogus; & &lt;x&gt; &quot;q&quot;\"/>");
@@ -194,7 +192,6 @@ void TestXmlDecode()
                "&#0; &#x110000; &#xD800; &#12 &amp &#; &#xZZ; \xF0\x9F\x98\x80");
 }
 
-// the Mods menu during a session
 void TestModsMenuDiff()
 {
     std::vector<std::wstring> known = {L"C:\\Mods\\A\\", L"C:\\Mods\\B\\", L"E:\\ws\\1239080\\31\\"};
@@ -226,7 +223,7 @@ void TestModsMenuDiff()
                L"c:\\users\\u\\appdata\\local\\killhousegames\\doorkickers2\\mods_upload\\eras\\");
 }
 
-// returns the fingerprint of the native folder as SetUp wrote it
+// returns the native folder's fingerprint as SetUp wrote it
 std::wstring TestFingerprints(const Paths& p)
 {
     std::wstring f1 = Consent_Fingerprint(p.native);
@@ -315,7 +312,7 @@ void TestSeveralItems(const Paths& p)
     Expect("prompt text: a long list is cut with a count", cutWithCount);
 }
 
-// which DLLs are plugins: decided from the export table, without running anything
+// which DLLs are plugins: from the export table, without running anything
 void TestPluginDetection(const Paths& p)
 {
     wchar_t self[MAX_PATH];
@@ -340,7 +337,7 @@ void TestPluginDetection(const Paths& p)
     Expect("a missing file is not", !Consent_IsPlugin(p.base + L"missing.dll"));
     Expect("checking didn't load it as a module", GetModuleHandleW(L"example_plugin.dll") == nullptr);
 
-    // the manifest (DK2ML_PluginManifest), read from the same mapping
+    // DK2ML_PluginManifest, read from the same mapping
     PluginManifest m;
     bool plugin = Consent_ReadPlugin(buildDir + L"example_plugin.dll", &m);
     Expect("manifest: the example's is read as written",

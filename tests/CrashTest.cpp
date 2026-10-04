@@ -1,6 +1,6 @@
-// Checks the crash report (loader/safety/CrashReport.cpp) without the game: the stack walk on this exe's own code, through a
-// post hook's swapped return address; the report's text with fake helpers; writing it once; keeping the newest files.
-// usage: crashtest.exe [--show]   (prints "all passed", exit code 0; --show also prints a sample report)
+// The crash report (loader/safety/CrashReport.cpp) without the game: the stack walk on this exe's code, through a
+// post hook's swapped return address; the text with fake helpers; writing once; keeping the newest files.
+// usage: crashtest.exe [--show]   (--show also prints a sample report)
 #include "../loader/Loader.h"
 
 #include <cstdio>
@@ -49,7 +49,7 @@ int IndexOf(void* function)
     return -1;
 }
 
-// Each one does work after its call, so none of the calls becomes a jump (tail call) and every frame stays.
+// Each does work after its call, so no call becomes a tail jump and every frame stays.
 extern "C" __declspec(noinline) int Walk3(int x)
 {
     RtlCaptureContext(&g_context);
@@ -74,8 +74,8 @@ extern "C" __declspec(noinline) int Walk1(int x)
     return r * 3;
 }
 
-// Hooked with a post: while it runs, its return address is the loader's SafeHookPostEntry. Work comes before the call
-// so the call isn't among the first bytes MinHook moves into its trampoline.
+// Post-hooked: while it runs, its return address is SafeHookPostEntry. Work before the call keeps the call out of the
+// bytes MinHook moves into its trampoline.
 extern "C" __declspec(noinline) int Hooked(int x)
 {
     g_sink += x * 7;
@@ -172,7 +172,7 @@ std::string ReadAll(const std::wstring& path)
 
 // --- the sections, in main's order ---
 
-// The walks themselves run from main: the checks expect main as the frame right after the walked functions.
+// The walks run from main: the checks expect main right after the walked functions.
 void CheckPlainWalk()
 {
     int i3 = IndexOf(&Walk3);
@@ -312,33 +312,28 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // a plain walk: innermost first, every caller in order
     Walk1(1);
     CheckPlainWalk();
 
-    // through a post hook: Hooked returns to SafeHookPostEntry; the walk follows the side stack to the real caller
+    // Hooked returns to SafeHookPostEntry; the walk follows the side stack to the real caller
     Expect("a post hook on Hooked", HookHooked());
     CallsHooked(3);
     CheckWalkThroughPost();
 
-    // the report's text, formatted inside Walk3 while Walk3..main are on the stack
     g_inside = FormatInside;
     Walk1(1);
     g_inside = nullptr;
     EXCEPTION_RECORD record = FakeAccessViolation();
     CheckReportText(g_text, argc > 1 && strcmp(argv[1], "--show") == 0);
 
-    // a small buffer is cut off cleanly
     CheckCutOff(record);
 
-    // writing it: once per process, into the folder given at startup, keeping the newest reports
     std::wstring dir = MakeReportDir();
     MakeOldReports(dir);
     CrashReport_Init(dir);
     CheckOldReportsTrimmed(dir);
     CheckWrite(dir, record);
 
-    // clean up
     RemoveReportDir(dir);
 
     printf(g_failures ? "%d FAILED\n" : "all passed\n", g_failures);

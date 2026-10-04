@@ -2,10 +2,9 @@
 
 #include <sstream>
 
-// Styles are copied from the game's own screens (data\gui\options.xml, mods.xml): the canvas is 2560x1440 with (0,0)
-// at the center and y up; "align" anchors an item to that side of its parent and "origin" offsets it from there.
-// Palette: orange f97b03, cream text f0e3cc, dark text 201f1b, panels 211e1dB3, row stripes 00000050, button body
-// 40392b (also Back's pressed tint).
+// Styles copied from options.xml/mods.xml: canvas 2560x1440, (0,0) at the center, y up; "align" anchors to that side
+// of the parent, "origin" offsets from there. Palette: orange f97b03, cream f0e3cc, dark text 201f1b, panels
+// 211e1dB3, row stripes 00000050, button body 40392b (also Back's pressed tint).
 
 namespace screenxml {
 
@@ -43,8 +42,7 @@ std::string Square(int w, int h, const char* color)
            "\" sizeY=\"" + std::to_string(h) + "\" color=\"" + color + "\"/>";
 }
 
-// The mouse wheel over an item that takes input scrolls that item, not the list it's in: the game's list templates
-// pass it on to their list like this.
+// The wheel over an item that takes input doesn't reach its list; the game's list templates forward it like this.
 std::string Wheel(const std::string& list)
 {
     // clang-format off
@@ -53,7 +51,6 @@ std::string Wheel(const std::string& list)
     // clang-format on
 }
 
-// Appends widget N (named WidgetName(N)) and returns N.
 int AddWidget(std::vector<Widget>& widgets, Widget::Kind kind, int page, int index)
 {
     int n = static_cast<int>(widgets.size());
@@ -61,7 +58,7 @@ int AddWidget(std::vector<Widget>& widgets, Widget::Kind kind, int page, int ind
     return n;
 }
 
-// A flat button in the game's palette: dark, cream on hover, orange when pressed. inner: extra child elements.
+// A flat button: dark, cream on hover, orange when pressed. inner: extra child elements.
 std::string FlatButton(const std::string& name, const std::string& align, int x, int y, int w, int h,
                        const std::string& text, const char* font, const std::string& actions,
                        const std::string& tooltip = "", const std::string& inner = "")
@@ -110,7 +107,7 @@ std::string Text(const std::string& name, const std::string& align, int x, int y
     return s.str();
 }
 
-// The 72px orange header strip the Options panels use.
+// The Options panels' 72px orange header strip.
 std::string PanelHeader(int width, const std::string& title)
 {
     // clang-format off
@@ -124,9 +121,8 @@ std::string PanelHeader(int width, const std::string& title)
     // clang-format on
 }
 
-// An entry of the mod list: a radio checkbox, built like the game's selectable lists (globals.xml
-// #squad_item_template). autoSiblingsUncheck unchecks the other entries when one is checked, and the checked state
-// takes no input, so it can't be clicked off. Checked means the page on show, in orange.
+// A mod-list entry: a radio checkbox like globals.xml #squad_item_template. autoSiblingsUncheck unchecks the others;
+// the checked state takes no input, so it can't be clicked off. Checked (orange) = the page on show.
 std::string SelectRow(int n, int y, const Page& page)
 {
     const int w = kListWidth - 40, h = 60;
@@ -174,7 +170,7 @@ std::string OptionWidget(const Option& o, int n, const std::string& list)
             // clang-format on
         };
 
-        // a click runs the state being left's OnClick, before the checkbox flips
+        // a click runs the current state's OnClick, before the flip
         // clang-format off
         s << "<Checkbox name=\"" << name << "\" origin=\"" << kWidgetX << " 0\""
           << " stealFocus=\"true\" defaultState=\"UncheckedState\">"
@@ -301,7 +297,7 @@ std::string Escape(const std::string& modText)
     std::string out;
     size_t start = 0;
     while (start < modText.size() && modText[start] == '@') {
-        ++start; // "@key" would show a game text instead
+        ++start;
     }
 
     for (size_t i = start; i < modText.size(); ++i) {
@@ -323,14 +319,12 @@ std::string Escape(const std::string& modText)
     return out;
 }
 
-// Send Feedback's banner (menus.xml, Extra Buttons), with its texts and colors. "origin" is relative to that row.
-// Send Feedback is at -300 90 and 64 high, so -300 170 sits right above it.
-// The banner texture has the feedback icon baked in at x 290-318, y 11-53 of 336x64, 136 right of the banner's center.
-// A patch in the banner's color covers it, with a "</>" in the label's font on top. A button state holds one image and
-// one text, so the icon is a pair of children swapped on hover, as in the game's waypoint menu. The click resets them,
-// because a menu hidden under the cursor never gets its hover end.
-// restart: a "!" badge in the warning color at the banner's left end, and a tooltip. Only a restart applies those
-// Mods-menu changes, and the XML is rebuilt at every GUI load, which follows each change.
+// Send Feedback's banner (menus.xml, Extra Buttons); origin is relative to that row. Send Feedback is at -300 90,
+// 64 high, so -300 170 is right above it.
+// The texture has the feedback icon baked in (x 290-318, y 11-53 of 336x64). A banner-colored patch covers it with a
+// "</>" on top: two children swapped on hover (a state holds one image and one text). The click resets them: a menu
+// hidden under the cursor never gets its hover end.
+// restart: a "!" badge and a tooltip. The XML is rebuilt at every GUI load, which follows each Mods-menu change.
 std::string MainMenuButton(bool restart)
 {
     auto icon = [](const char* name, bool hidden, const char* patch, const char* glyph) {
@@ -428,7 +422,7 @@ void AddFrame(std::ostringstream& x)
     // clang-format on
 }
 
-// The footer with Back (same as Options) and a note line.
+// The footer: Back (as in Options) and a note line.
 void AddFooter(std::ostringstream& x)
 {
     // clang-format off
@@ -472,9 +466,8 @@ void AddContentArea(std::ostringstream& x)
 // Left: the list of pages.
 void AddModList(std::ostringstream& x, const std::vector<Page>& pages, std::vector<Widget>& widgets)
 {
-    // An ItemList places its children from its own center and ignores their align (the game's Credits list is 1160
-    // high, first row at origin 0 540). So a row's y is listHeight/2 - rowHeight/2 - row*pitch. Here rows are 60
-    // high with a 70 pitch and a 10 margin at the top, hence -40.
+    // An ItemList places children from its center and ignores their align (Credits: 1160 high, first row at 0 540),
+    // so row y = listHeight/2 - rowHeight/2 - row*pitch. Rows: 60 high, 70 pitch, 10 top margin, hence -40.
     const int modListHeight = kPanelHeight - 100;
     // clang-format off
     x << "<Item align=\"t\" sizeX=\"" << kListWidth << "\" sizeY=\"" << kPanelHeight << "\" origin=\"-720 -120\">"
@@ -496,21 +489,21 @@ void AddModList(std::ostringstream& x, const std::vector<Page>& pages, std::vect
     x << "</ItemList></Item>";
 }
 
-// The page's fixed part: info lines, status, warning lines, buttons and a rule. Returns the y below it.
+// The page's fixed part (info, status, warnings, buttons, a rule). Returns the y below it.
 int AddPageInfo(std::ostringstream& x, const Page& page, int pi, std::vector<Widget>& widgets)
 {
-    // Compact on purpose: the settings below get the room. Text origins are the items' top edges.
+    // Compact: the settings below get the room. Text origins are top edges.
     int y = -88;
     const int firstLine = y;
     for (const auto& line : page.lines) {
-        // leave the right of the first line to the status when there is one
+        // the status takes the right of the first line
         int width = page.hasStatus && y == firstLine ? 880 : 1320;
         x << Text("", "tl", 24, y, line, "paragraph_2", "f0e3cc",
                   " sizeX=\"" + std::to_string(width) + "\" fontAutoDownsize=\"true\"");
         y -= 34;
     }
     if (page.hasStatus) {
-        // right-aligned (no sizeX: a sized text box would center it)
+        // right-aligned, so no sizeX
         x << Text(StatusName(pi, true), "tr", -24, firstLine, "", "paragraph_2", "f97b03")
           << Text(StatusName(pi, false), "tr", -24, firstLine, "", "paragraph_2", "f0a377");
         if (page.lines.empty()) {
@@ -538,14 +531,14 @@ int AddPageInfo(std::ostringstream& x, const Page& page, int pi, std::vector<Wid
         x << "<StaticImage align=\"t\" origin=\"0 " << y << "\">" << Square(kPageWidth - 40, 2, "f0e3cc26")
           << "</StaticImage>";
         y -= 14;
-        if (page.options.empty()) { // a mod that isn't running declared no options, which doesn't mean it has none
+        if (page.options.empty()) { // a mod not running declared none, but may have some
             x << Text("", "tl", 24, y, page.dimmed ? kSettingsWhenRunning : kNoSettings, "paragraph_2", "a08f80");
         }
     }
     return y;
 }
 
-// One row of the settings list: a header strip, or a label (on a stripe every other row) and the option's widget.
+// One settings row: a header strip, or a label (striped every other row) and the option's widget.
 void AddOptionRow(std::ostringstream& x, const Option& opt, int row, int listHeight, int pi,
                   std::vector<Widget>& widgets)
 {
@@ -571,7 +564,7 @@ void AddOptionRow(std::ostringstream& x, const Option& opt, int row, int listHei
     x << "</Item>";
 }
 
-// The page's settings: a scrolling list from y to the bottom of the page.
+// A scrolling settings list from y to the page bottom.
 void AddOptionsList(std::ostringstream& x, const Page& page, int pi, int y, std::vector<Widget>& widgets)
 {
     const int listHeight = kPanelHeight + y - 20;

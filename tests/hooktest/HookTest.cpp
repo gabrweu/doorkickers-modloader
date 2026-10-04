@@ -1,7 +1,5 @@
-// Checks that safe hooks (loader/hooks/SafeHook.cpp) keep every register, including the ones the x64 ABI calls
-// volatile, because the game's link-time-optimized callers keep values in them across calls. Also checks that the same
-// comparison catches a plain C++ detour, so a pass means something.
-// usage: hooktest.exe   (prints "all passed", exit code 0)
+// Safe hooks (loader/hooks/SafeHook.cpp) must keep every register, ABI-volatile ones included: LTCG callers keep
+// values in them across calls. A plain C++ detour must fail the same check, or a pass means nothing.
 #include "../../loader/Loader.h"
 
 #include <cstdio>
@@ -39,7 +37,7 @@ HT_State MakeInput()
         g[i] = 0x1111111111111111ull * (i + 1) ^ 0x0123456789ABCDEFull;
     }
 
-    s.rflags = 0x2 | 0x1 | 0x4 | 0x40 | 0x80 | 0x800; // CF PF ZF SF OF set, so a pass can't be "flags happened to be 0"
+    s.rflags = 0x2 | 0x1 | 0x4 | 0x40 | 0x80 | 0x800; // CF PF ZF SF OF set: a pass isn't zero flags by luck
 
     for (int i = 0; i < 16; ++i) {
         s.xmm[i] = {0xA5A5000000000000ull | i, 0x5A5A000000000000ull | (i << 8)};
@@ -47,7 +45,7 @@ HT_State MakeInput()
     return s;
 }
 
-// compares every register except the ones listed in `except` (names, "flags", "xmmN")
+// every register except `except` (names, "flags", "xmmN")
 int Compare(const char* test, const HT_State& want, const HT_State& got, const char* const* except = nullptr)
 {
     auto skipped = [&](const char* name) {
@@ -103,7 +101,7 @@ HT_State Run(void* fn, const HT_State& in)
     return out;
 }
 
-// callbacks: each first clobbers every volatile register, like any compiled C++ may
+// callbacks clobber every volatile register first, as compiled C++ may
 int PrePass(DK2ML_Regs*, void*)
 {
     HT_Clobber();
@@ -147,7 +145,7 @@ void PostArgs(DK2ML_Regs* r, void*)
     r->rax += 1;
 }
 
-// fake plugin modules: hooks are grouped by owner, and a crash switches off all hooks of that owner
+// fake plugin modules: a crash switches off all hooks of that owner
 const HMODULE kPassOwner = reinterpret_cast<HMODULE>(0x10000);
 const HMODULE kCrashPreOwner = reinterpret_cast<HMODULE>(0x20000);
 const HMODULE kCrashPostOwner = reinterpret_cast<HMODULE>(0x30000);
@@ -287,7 +285,6 @@ int PreOnlyCount(DK2ML_Regs*, void*)
     return DK2ML_CALL_ORIGINAL;
 }
 
-// a pre that switches its own hook off still gets its post for that call
 const HMODULE kSelfOwner = reinterpret_cast<HMODULE>(0x60000);
 
 int PreDisableSelf(DK2ML_Regs*, void* target)
@@ -298,8 +295,7 @@ int PreDisableSelf(DK2ML_Regs*, void* target)
     return DK2ML_CALL_ORIGINAL;
 }
 
-// the argument/result helpers in dk2ml.h. HT_Call keeps `out` and `fn` at [rsp+32] and [rsp+40] when it calls, which
-// is where the 5th and 6th arguments go.
+// dk2ml.h's argument/result helpers. HT_Call keeps `out` and `fn` at [rsp+32]/[rsp+40]: the 5th and 6th arguments.
 bool g_helpersOk = false;
 uint64_t g_wantArg4 = 0;
 uint64_t g_wantArg5 = 0;
@@ -308,7 +304,7 @@ int PreHelpers(DK2ML_Regs* r, void*)
 {
     HT_Clobber();
 
-    // plain reads of the saved registers and the caller's stack, so evaluating all of them changes nothing
+    // pure reads of the saved registers and the caller's stack
     bool registerArgs = DK2ML_Arg(r, 0) == 0x1000 && DK2ML_Arg(r, 1) == r->rdx && DK2ML_Arg(r, 3) == r->r9;
     bool floatArg = DK2ML_ArgFloat(r, 1) == 2.5f;
     bool stackArgs = DK2ML_Arg(r, 4) == g_wantArg4 && DK2ML_Arg(r, 5) == g_wantArg5;
@@ -358,7 +354,7 @@ int PreChain(DK2ML_Regs* r, void* user)
     g_chainSeq.push_back(i);
 
     if (r->scratch[0] != 0) {
-        g_chainScratchOk = false; // each callback starts with its own, empty scratch
+        g_chainScratchOk = false;
     }
     r->scratch[0] = 1000 + i;
     r->rcx += 1;
@@ -436,14 +432,14 @@ int CountInLog(const char* text)
 
 void* g_plainOriginal = nullptr;
 
-// an ordinary C++ detour; it clobbers volatile registers that the caller keeps across the call
+// a plain C++ detour: clobbers volatile registers the caller keeps across the call
 extern "C" void PlainDetour()
 {
     HT_Clobber();
     reinterpret_cast<void (*)()>(g_plainOriginal)();
 }
 
-// baseline: the harness itself, and a plain detour that must be caught, or the test proves nothing
+// baseline: the harness, and a plain detour that must be caught or the test proves nothing
 void TestBaseline(const HT_State& in)
 {
     int n = Compare("unhooked nop", in, Run(&HT_Nop, in));
@@ -457,12 +453,10 @@ void TestBaseline(const HT_State& in)
     MH_RemoveHook(&HT_Nop);
 }
 
-// one safe hook at a time: pass-through, skip, argument and result changes, recursion
 void TestSingleHooks(const HT_State& in)
 {
     int n;
 
-    // pass-through, pre + post
     SafeHook_Create(&HT_Nop, PrePass, PostPass, nullptr, kPassOwner);
     EnableAll(&HT_Nop);
     g_preCalls = g_postCalls = 0;
@@ -470,21 +464,18 @@ void TestSingleHooks(const HT_State& in)
     Expect("safe hook, pre+post pass-through keeps everything", n == 0 && g_preCalls == 1 && g_postCalls == 1, n);
     SafeHook_Remove(&HT_Nop);
 
-    // pre only
     SafeHook_Create(&HT_Nop, PrePass, nullptr, nullptr, kPassOwner);
     EnableAll(&HT_Nop);
     n = Compare("safe pre only", in, Run(&HT_Nop, in));
     Expect("safe hook, pre only keeps everything", n == 0, n);
     SafeHook_Remove(&HT_Nop);
 
-    // post only
     SafeHook_Create(&HT_Nop, nullptr, PostPass, nullptr, kPassOwner);
     EnableAll(&HT_Nop);
     n = Compare("safe post only", in, Run(&HT_Nop, in));
     Expect("safe hook, post only keeps everything", n == 0, n);
     SafeHook_Remove(&HT_Nop);
 
-    // skip with a return value
     SafeHook_Create(&HT_Nop, PreSkip, PostPass, nullptr, kPassOwner);
     EnableAll(&HT_Nop);
     g_postCalls = 0;
@@ -499,7 +490,6 @@ void TestSingleHooks(const HT_State& in)
     }
     SafeHook_Remove(&HT_Nop);
 
-    // changing arguments, changing the result in post
     SafeHook_Create(&HT_RetRcx, PreArgs, PostArgs, nullptr, kPassOwner);
     EnableAll(&HT_RetRcx);
     {
@@ -535,15 +525,13 @@ void TestSingleHooks(const HT_State& in)
     SafeHook_Remove(&HT_Recurse);
 }
 
-// crash containment: a crashing callback leaves the call as the caller set it up and switches off its plugin
 void TestCrashContainment(const HT_State& in)
 {
     int n;
 
-    // a pre that crashes leaves the call untouched, and every hook of its plugin passes through
     SafeHook_SetFaultCallback(OnFault);
     SafeHook_Create(&HT_Nop, PreCrash, PostPass, nullptr, kCrashPreOwner);
-    SafeHook_Create(&HT_RetRcx, PrePass, PostPass, nullptr, kCrashPreOwner); // same plugin, never crashes itself
+    SafeHook_Create(&HT_RetRcx, PrePass, PostPass, nullptr, kCrashPreOwner); // same plugin, doesn't crash
     EnableAll(&HT_Nop);
     EnableAll(&HT_RetRcx);
     {
@@ -565,7 +553,7 @@ void TestCrashContainment(const HT_State& in)
     SafeHook_Remove(&HT_Nop);
     SafeHook_Remove(&HT_RetRcx);
 
-    // a post that crashes: the caller still gets the original's result and registers
+    // crashing post: the caller still gets the original's result and registers
     SafeHook_Create(&HT_RetRcx, PrePass, PostCrash, nullptr, kCrashPostOwner);
     EnableAll(&HT_RetRcx);
     {
@@ -582,7 +570,6 @@ void TestCrashContainment(const HT_State& in)
     SafeHook_Remove(&HT_RetRcx);
 }
 
-// chains: two plugins on one function
 void TestChains(const HT_State& in)
 {
     int n;
@@ -626,8 +613,7 @@ void TestChains(const HT_State& in)
         HT_State out = Run(&HT_RetRcx, in);
         std::string order = Order();
 
-        // the skipper's own post and everything after it don't run; A's pre ran, so A's post gets the skipper's
-        // result (7 * 2)
+        // the skipper's post and later callbacks don't run; A's pre ran, so A's post gets the skipper's result (7 * 2)
         bool ok = order == "asA" && out.rax == 14 && g_scratchOk;
         if (!ok) {
             printf("  order %s, rax %llu\n", order.c_str(), out.rax);
@@ -636,8 +622,7 @@ void TestChains(const HT_State& in)
     }
     SafeHook_Remove(&HT_RetRcx);
 
-    // a skip on a single hook with a pre-only skipper and a post-only callback before it: the registers the caller
-    // sees are the skipper's, with every other register kept
+    // pre-only skipper after a post-only callback: the caller gets the skipper's rax/xmm0, every other register kept
     SafeHook_Create(&HT_Nop, nullptr, PostPass, nullptr, kOwnerA);
     SafeHook_Create(&HT_Nop, PreSkip, nullptr, nullptr, kOwnerB);
     SafeHook_SetEnabled(&HT_Nop, kOwnerA, true);
@@ -676,7 +661,6 @@ void TestChains(const HT_State& in)
     SafeHook_Remove(&HT_RetRcx);
 }
 
-// pre/post pairs stay matched: deeper than the side stack, and when a pre switches its own hook off
 void TestMatchedPairs(const HT_State& in)
 {
     int n;
@@ -722,7 +706,6 @@ void TestMatchedPairs(const HT_State& in)
     SafeHook_Remove(&HT_RetRcx);
 }
 
-// the argument/result helpers in dk2ml.h
 void TestHelpers(const HT_State& in)
 {
     SafeHook_Create(&HT_RetRcx, PreHelpers, PostHelpers, nullptr, kPassOwner);
@@ -746,7 +729,7 @@ void TestHelpers(const HT_State& in)
     SafeHook_Remove(&HT_RetRcx);
 }
 
-// long chains: no fixed limit; switches, order, scratch and skips still work with 40 owners
+// no fixed chain limit: switches, order, scratch and skips with 40 owners
 void TestLongChain(const HT_State& in)
 {
     int n;

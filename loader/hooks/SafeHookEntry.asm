@@ -1,11 +1,9 @@
-; Register-preserving hook entry/exit, see SafeHook in SafeHook.cpp and "safe hooks" in dk2ml.h.
+; Safe-hook entry/exit; see the top of SafeHook.cpp.
 ;
-; The game is built with link-time code generation, so callers may keep values in registers the x64 ABI calls
-; volatile across a call. These routines save every register (GPRs, rflags, xmm0-15), call into C++, restore every
-; register (with whatever the callbacks changed) and continue exactly as the caller set things up.
+; LTCG callers keep values in ABI-volatile registers across calls, so these save every register (GPRs, rflags,
+; xmm0-15), call into C++ and restore them, with the callbacks' changes.
 ;
-; Per-hook stub (generated in SafeHook.cpp):   push rax / mov rax, record / xchg [rsp], rax / jmp SafeHookEntry
-; so on entry here: [rsp] = record, [rsp+8] = return address, all registers = the caller's.
+; Per-hook stub (SafeHook.cpp): push rax / mov rax, record / xchg [rsp], rax / jmp SafeHookEntry
 
 EXTERN SafeHook_Pre:PROC   ; int SafeHook_Pre(DK2ML_Regs*, SafeHookRecord*): 0 call original, 1 skip
 EXTERN SafeHook_Post:PROC  ; uint64_t SafeHook_Post(DK2ML_Regs*): returns the real return address
@@ -32,8 +30,8 @@ R_STACK  = 384
 R_SCRATCH = 392
 REGS_SPACE = 432           ; sizeof(DK2ML_Regs) = 424, rounded up
 
-REGS     = 32              ; DK2ML_Regs lives above the 32-byte home space for the C++ calls
-ENTRY_FRAME = 32 + REGS_SPACE + 8   ; = 472, keeps rsp 16-aligned at the call (entry rsp is 8 mod 16 after pushfq)
+REGS     = 32              ; above the 32-byte home space
+ENTRY_FRAME = 32 + REGS_SPACE + 8   ; = 472, rsp 16-aligned at the call (entry rsp is 8 mod 16 after pushfq)
 POST_FRAME  = 32 + REGS_SPACE       ; = 464 (post entry: rsp 0 mod 16, then sub 8 + pushfq)
 
 SAVE_REGS MACRO frame
@@ -75,10 +73,10 @@ SAVE_REGS MACRO frame
     mov [rsp + REGS + R_SCRATCH + 8], rax
     mov [rsp + REGS + R_SCRATCH + 16], rax
     mov [rsp + REGS + R_SCRATCH + 24], rax
-    cld                                 ; ABI requirement for the C++ call
+    cld                                 ; ABI: DF clear at calls
 ENDM
 
-; restores everything from DK2ML_Regs; rflags goes back into the pushfq slot (popped by the caller of the macro)
+; rflags goes back into the pushfq slot; the macro's user pops it
 RESTORE_REGS MACRO frame
     mov rax, [rsp + REGS + R_FLAGS]
     mov [rsp + frame], rax
@@ -131,7 +129,7 @@ SafeHookEntry PROC
     test eax, eax
     jnz skip_original
 
-    ; continue into the original: its trampoline goes into the record slot and `ret` jumps there
+    ; trampoline into the record slot; `ret` jumps there
     mov rax, [rsp + ENTRY_FRAME + 8]
     mov rax, [rax]                                  ; SafeHookRecord::trampoline (first field)
     mov [rsp + ENTRY_FRAME + 8], rax
@@ -148,7 +146,7 @@ skip_original:
     ret                                             ; -> caller
 SafeHookEntry ENDP
 
-; The original returns here when the hook has a post callback (SafeHook_Pre replaced its return address).
+; The original returns here when SafeHook_Pre swapped its return address.
 SafeHookPostEntry PROC
     lea rsp, [rsp - 8]                              ; slot for the real return address (lea: flags not saved yet)
     pushfq

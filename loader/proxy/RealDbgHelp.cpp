@@ -1,6 +1,5 @@
-// The real dbghelp.dll, loaded from System32 by full path (a bare "dbghelp.dll" would resolve to the stub).
-// The stub's jumps in Exports.asm go through g_dbghelpReal, which is filled here at process attach; dk2ml.dll and
-// symtest only use RealDbghelp().
+// System32's dbghelp.dll, by full path: a bare "dbghelp.dll" resolves to the stub. Fills g_dbghelpReal for the stub's
+// jumps (Exports.asm); dk2ml.dll and symtest use only RealDbghelp().
 #include "Loader.h"
 
 namespace {
@@ -12,8 +11,7 @@ constexpr size_t kExportCount = sizeof(kExportNames) / sizeof(kExportNames[0]);
 
 HMODULE g_real = nullptr;
 
-// Stands in for an export this Windows version's dbghelp doesn't have (the list is generated on the build machine).
-// All dbghelp functions report failure with a zero/FALSE result.
+// For exports this Windows' dbghelp lacks (the list comes from the build machine). Zero/FALSE is dbghelp's failure.
 extern "C" uintptr_t MissingExport()
 {
     SetLastError(ERROR_PROC_NOT_FOUND);

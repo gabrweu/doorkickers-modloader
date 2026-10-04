@@ -1,9 +1,7 @@
-// Interfaces (DK2ML_API::PublishInterface/GetInterface): plugins offering function tables to each other by name.
+// Interfaces (PublishInterface/GetInterface): function tables plugins share by name.
 //
-// Tables are published only while plugins initialize and looked up only after (from PLUGINS_LOADED on), so what a
-// plugin finds never depends on the load order. A publisher that gets switched off (failed init, crash, Mods menu) is
-// withdrawn, because its table points into code that is switched off. Doesn't touch the game, so eventstest runs it
-// without the game.
+// Published only during init, looked up only after (PLUGINS_LOADED on), so lookups don't depend on load order. A
+// switched-off publisher is withdrawn: its tables point into switched-off code. Doesn't touch the game (eventstest).
 #include "Loader.h"
 
 #include <algorithm>
@@ -16,14 +14,13 @@ struct Published {
     const void* table;
     HMODULE owner;
     bool faulted;
-    std::vector<HMODULE> users; // plugins that got it at least once
+    std::vector<HMODULE> users; // plugins that got it
 };
 
-// Lookups come from any thread, and a switch-off from wherever a plugin crashed, so one lock covers all of it. Nothing
-// calls out while holding it.
+// One lock: lookups come from any thread, switch-offs from any crash site. Nothing calls out under it.
 SRWLOCK g_lock = SRWLOCK_INIT;
 std::vector<Published> g_published;
-std::vector<HMODULE> g_toldEarly; // plugins whose lookup during init was logged (once each)
+std::vector<HMODULE> g_toldEarly; // lookup during init already logged
 bool g_open = false;
 
 struct Exclusive {

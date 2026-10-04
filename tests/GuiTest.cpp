@@ -1,7 +1,6 @@
-// Checks the GUI callback thunks and input capture (loader/gui/GuiThunks.cpp) without the game. A fake GUI::sAction is
-// run by calling its pCallback the way the game does (void(const sAction&)). The plugin's function must get the
-// action's owner, the cursor and its user pointer, under crash containment.
-// usage: guitest.exe   (prints "all passed", exit code 0)
+// GUI callback thunks and input capture (loader/gui/GuiThunks.cpp) without the game. A fake GUI::sAction's pCallback
+// is called as the game does (void(const sAction&)); the plugin's function must get the owner, cursor and user
+// pointer, under crash containment.
 #include "../loader/Loader.h"
 
 #include <cstdio>
@@ -65,7 +64,7 @@ void OnCrash(HMODULE owner)
     ++g_crashes;
 }
 
-// what the game does when the action runs
+// as the game runs the action
 void Run(FakeAction& a)
 {
     a.pCallback(&a);
@@ -80,7 +79,7 @@ std::string Calls()
 
 using ActionFn = void (*)(const void*);
 
-// plugin A's two thunks: user pointer "a" and "b"
+// plugin A's thunks for user pointers "a" and "b"
 struct Thunks {
     void* a;
     void* b;

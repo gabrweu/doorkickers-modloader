@@ -1,8 +1,7 @@
-# Disassembles game functions by (mangled-name substring), annotating call/jmp/lea targets with symbol names.
-# Needs LLVM (llvm-objdump) and the public symbols dumped from the game's PDB. The dump is derived from the game, so
-# keep it local and never publish it. To make it:
+# Disassembles game functions by mangled-name substring, annotating call/jmp/lea targets with symbol names.
+# Needs LLVM (llvm-objdump) and a publics dump of the game's PDB. The dump is game-derived: keep it local.
 #   llvm-pdbutil dump -publics "<game>\DoorKickers2.pdb" > publics.txt
-# In the loader repository, publics.txt and the output go in re\ (git-ignored); elsewhere, next to this script.
+# In the loader repo, publics.txt and the output go in re\ (git-ignored); elsewhere, next to this script.
 # usage: disasm.ps1 -Names '?UpdateCamera@GameClient', '?SetDefaults@Camera' [-GameDir ...] [-Publics ...] [-OutDir ...]
 param(
     [Parameter(Mandatory)][string[]]$Names,
@@ -26,8 +25,8 @@ if (-not $Objdump) {
 }
 if (-not (Test-Path $Objdump)) { throw "llvm-objdump not found (install LLVM or pass -Objdump)" }
 
-# Section addresses come from the exe's own headers. Publics give addresses as <section>:<offset>, and objdump shows
-# them at the exe's preferred image base. Both change with game builds, so nothing is hardcoded.
+# Section addresses come from the exe's headers: publics give <section>:<offset>, objdump uses the preferred image
+# base, and both change with game builds.
 function Get-Sections([string]$path) {
     $buf = New-Object byte[] 4096
     $fs = [IO.File]::OpenRead($path)

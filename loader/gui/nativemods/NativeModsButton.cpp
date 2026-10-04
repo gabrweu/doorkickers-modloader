@@ -1,12 +1,8 @@
-// The "Native mods" button (main menu, above "Send Feedback") and screen. GameHooks.cpp calls in from its frame tick
-// and GUI-load hooks.
+// The "Native mods" button (main menu, above "Send Feedback") and screen; called from GameHooks.cpp.
 //
-// The loader has no mod folder for a GUI file. So while GUIManager::Load merges the GUI files, one more document is
-// merged from memory through GUIManager::MergeItemsFromXML, the game's own path for data\gui and mods' gui\ files.
-// Its items get the same parsing and action-target checks. It holds the button and the whole "Native mods" screen,
-// generated from the loader's records (NativeModsScreen.cpp / NativeModsScreenXml.cpp).
-// Merged items land at the top level. Each frame the button is moved into Menu_Main > "Extra Buttons" (the row with
-// Options, Mods, Replays and Send Feedback) with the game's AddChild action, so it shows and hides with the menu.
+// The loader has no mod folder, so during GUIManager::Load it merges one more document (button + screen) from memory
+// through MergeItemsFromXML: same parsing and action-target checks as gui files. Items land at the top level; each
+// frame AddChild moves the button into Menu_Main > "Extra Buttons", so it shows and hides with the menu.
 #include "Loader.h"
 
 #include <cstring>
@@ -27,8 +23,8 @@ bool g_mergedThisLoad = false;
 bool g_attachGaveUp = false;
 bool g_loggedAttach = false;
 
-// A fresh document per GUI load, never freed. SetContentsAndLoadFromMem keeps the buffer and writes buffer[length], so
-// it gets length + 1 bytes. A destructor would free the buffer with the game's heap. It costs a few KB per GUI load.
+// A document per GUI load (a few KB), never freed: a destructor would free the buffer with the game's heap.
+// length + 1: the load writes buffer[length].
 void* MakeDocument(const std::string& items)
 {
     std::string text = "<GUIItems>" + screenxml::MainMenuButton(Plugins_RestartNeeded()) + items + "</GUIItems>";
@@ -55,20 +51,20 @@ int MergeItemsPre(DK2ML_Regs* r, void*)
     return DK2ML_CALL_ORIGINAL;
 }
 
-// After the first GUI file of a load: merge ours too (before Load checks every action's target).
+// After a load's first GUI file, merge ours (before Load checks action targets).
 void MergeItemsPost(DK2ML_Regs* r, void*)
 {
     if (!g_inGuiLoad || g_mergedThisLoad) {
         return;
     }
-    g_mergedThisLoad = true; // also stops the merge below from re-entering here
+    g_mergedThisLoad = true; // also stops re-entry from the merge below
     if (void* doc = MakeDocument(Screen_BuildItems())) {
         int result = fn.MergeItemsFromXML(reinterpret_cast<void*>(r->scratch[0]), doc);
         LogF("menu: Native mods button and screen %s", result == 0 ? "added" : "could not be added");
     }
 }
 
-// Keeps the button in Menu_Main > Extra Buttons (re-checked every frame, so a GUI reload just gets re-attached).
+// Per frame, so a GUI reload gets re-attached.
 void AttachButton()
 {
     void* manager = *globals.guiManager;
@@ -91,7 +87,7 @@ void AttachButton()
     }
 
     if (Field<void*>(button, off.itemParent) != row) {
-        // equivalent of <Action type="AddChild" target="#dk2ml_native_mods"/> owned by the row
+        // <Action type="AddChild" target="#dk2ml_native_mods"/> owned by the row
         std::vector<char> action(off.actionSize, 0);
         Field<void*>(action.data(), off.actionOwner) = row;
         Field<int>(action.data(), off.actionType) = static_cast<int>(off.actionAddChild);
@@ -154,7 +150,7 @@ void Menu_OnGuiLoadBegin()
 {
     g_inGuiLoad = true;
     g_mergedThisLoad = false;
-    g_attachGaveUp = false; // a GUI reload builds everything anew
+    g_attachGaveUp = false; // a GUI reload rebuilds everything
 }
 
 void Menu_OnGuiLoadEnd()

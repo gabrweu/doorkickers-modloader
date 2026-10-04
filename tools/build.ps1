@@ -1,5 +1,5 @@
-# Builds the loader (dk2ml.dll + the dbghelp.dll stub) and its test tools with MSVC x64 into build\.
-# -Config picks the CMake build type (default Release).
+# Builds the loader (dk2ml.dll + the dbghelp.dll stub) and test tools (MSVC x64) into build\.
+# -Config: CMake build type (default Release).
 param([string]$Config = 'Release')
 
 $ErrorActionPreference = 'Stop'

@@ -1,10 +1,8 @@
-// Events (DK2ML_API::Subscribe): the loader hooks the game's common moments once (GameHooks.cpp) and calls every plugin
-// that subscribed, so plugins need no hooks of their own for them and any number can listen.
+// Events (DK2ML_API::Subscribe): each source is hooked once (GameHooks.cpp); every subscriber gets called.
 //
-// Subscriptions are only taken while plugins initialize, so dispatch reads the lists without a lock. Each callback
-// runs under __try. A crash switches off that plugin (its hooks, options and subscriptions), and the others keep
-// running. Tasks (DK2ML_API::AddTask) come from any thread at any time. They wait in a locked queue until the next
-// frame and run the same way. Doesn't touch the game, so eventstest runs it without the game.
+// Subscriptions are taken only during init, so dispatch reads the lists without a lock. Callbacks run under __try; a
+// crash switches off that plugin. Tasks (AddTask) come from any thread and wait in a locked queue for the next frame.
+// Doesn't touch the game (eventstest).
 #include "Loader.h"
 
 #include <malloc.h> // _resetstkoflw
@@ -18,20 +16,20 @@ struct Subscriber {
     DK2ML_EventFn fn;
     void* user;
     HMODULE owner;
-    volatile bool faulted; // its plugin was switched off: no more calls
+    volatile bool faulted; // owner switched off
 };
 
 constexpr int kEventTypes = DK2ML_EVENT_WINDOW_RESIZED + 1;
-std::vector<Subscriber> g_subscribers[kEventTypes]; // GUI_EVENT's stay empty: they're by id, below
+std::vector<Subscriber> g_subscribers[kEventTypes]; // GUI_EVENT's stays empty (by id, below)
 
-// SubscribeGuiEvent: one of the game's GUI events by id (GUI::Events::eEventType)
+// SubscribeGuiEvent, by GUI::Events::eEventType id
 struct GuiSubscriber {
     uint32_t id;
     Subscriber s;
 };
 
 std::vector<GuiSubscriber> g_guiSubscribers;
-constexpr uint32_t kMaxGuiEventId = 0xFFFF; // the game has 259; the real range is checked against the game (GuiKit.cpp)
+constexpr uint32_t kMaxGuiEventId = 0xFFFF; // the game has 259; GuiKit.cpp checks the real range
 
 bool g_open = false;
 int64_t g_lastState = -1; // -1: no GameClient
@@ -43,13 +41,13 @@ struct Task {
     HMODULE owner;
 };
 
-// Limit on queued tasks. Frames can stop for a while (random map generation), so the queue is capped.
+// Capped: frames stop during random map generation.
 constexpr size_t kMaxTasks = 4096;
 SRWLOCK g_tasksLock = SRWLOCK_INIT; // the queue and the lists below
 std::vector<Task> g_tasks;
-std::vector<HMODULE> g_faultedOwners; // switched off: their tasks are dropped
-std::vector<HMODULE> g_toldFull; // plugins whose refusal for a full queue was logged (once each)
-bool g_tasksAvailable = true; // false: this game build has no frame tick, tasks would never run
+std::vector<HMODULE> g_faultedOwners; // their tasks are dropped
+std::vector<HMODULE> g_toldFull; // full-queue refusal already logged
+bool g_tasksAvailable = true; // false: no frame tick in this build
 
 thread_local DWORD t_code;
 
@@ -90,7 +88,7 @@ bool IsFaulted(HMODULE owner) // under g_tasksLock
     return false;
 }
 
-// A full queue's refusal is logged once per plugin: true the first time, which records the plugin.
+// True the first time per plugin, and records it.
 bool FirstFullQueueRefusal(HMODULE owner) // under g_tasksLock
 {
     bool told = false;
@@ -334,7 +332,7 @@ DK2ML_Status Events_AddTask(HMODULE owner, DK2ML_TaskFn fn, void* user)
     if (!g_tasksAvailable) {
         refused = "this game build has no frame tick";
     } else if (IsFaulted(owner)) {
-        refused = ""; // switched off; the switch-off was logged, so this refusal isn't
+        refused = ""; // switched off, already logged
     } else if (g_tasks.size() >= kMaxTasks) {
         refused = FirstFullQueueRefusal(owner) ? "too many tasks waiting (4096)" : "";
     } else {
@@ -350,7 +348,7 @@ DK2ML_Status Events_AddTask(HMODULE owner, DK2ML_TaskFn fn, void* user)
 
 void Events_RunTasks()
 {
-    // take the whole queue: tasks queued while these run (by them or other threads) wait for the next frame
+    // take the whole queue: tasks queued meanwhile wait for the next frame
     std::vector<Task> due;
     AcquireSRWLockExclusive(&g_tasksLock);
     due.swap(g_tasks);
@@ -358,7 +356,7 @@ void Events_RunTasks()
 
     for (const Task& t : due) {
         AcquireSRWLockShared(&g_tasksLock);
-        bool faulted = IsFaulted(t.owner); // an earlier task (or another thread) may have switched it off
+        bool faulted = IsFaulted(t.owner); // an earlier task may have switched it off
         ReleaseSRWLockShared(&g_tasksLock);
         if (!faulted && !CallTask(t)) {
             Contain(t.owner, "task (AddTask)");

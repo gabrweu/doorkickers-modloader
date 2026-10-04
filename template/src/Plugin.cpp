@@ -1,10 +1,9 @@
-// A starting point for a Door Kickers 2 native mod. It shows the everyday pieces:
-//   - loader events for every frame, game state changes and map loads (no hooks needed, and any number of mods can
-//     listen);
+// Starting point for a Door Kickers 2 native mod, with the everyday pieces:
+//   - loader events: every frame, game state changes, map loads (no hooks; any number of mods can listen);
 //   - game functions, fields and enum values by name (dk2ml.hpp), resolved once in DK2ML_PluginInit;
 //   - a safe hook of your own, with typed arguments;
-//   - a hotkey that only fires while the game has focus;
-//   - settings on the loader's "Native mods" screen, saved in the settings folder the loader gives you.
+//   - a hotkey that fires only while the game has focus;
+//   - settings on the "Native mods" screen, saved in the loader's settings folder.
 // Replace the behavior with yours. Check names with: tools\symtest.exe "<game folder>" --find "GameClient::*"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -13,10 +12,9 @@
 
 #include "dk2ml.hpp"
 
-// The manifest: who this plugin is, shown on the Native mods screen, in dk2ml.log and in crash reports. The loader
-// reads it from the DLL without running any of its code. The first number is the plugin API version the plugin needs
-// (DK2ML_API_VERSION of the dk2ml.h it was built with). Keep the version in step with your releases, and gameVersion
-// with mod.xml.
+// Manifest: shown on the Native mods screen, in dk2ml.log and in crash reports; read without running plugin code.
+// First number: the plugin API version needed (DK2ML_API_VERSION of the dk2ml.h built with). Keep the version in step
+// with your releases, and gameVersion with mod.xml.
 DK2ML_PLUGIN_MANIFEST(1, "My Plugin", "1.0.0", "You", "", 112);
 
 namespace {
@@ -62,7 +60,7 @@ void LoadSettings()
     g_enabled = GetPrivateProfileIntW(L"settings", L"enabled", g_enabled, g_settingsFile.c_str()) != 0;
     g_hotkey = GetPrivateProfileIntW(L"settings", L"hotkey", g_hotkey, g_settingsFile.c_str());
 
-    // the profile API has no float reader, so read the text and convert it
+    // the profile API has no float reader
     wchar_t buf[32] = {};
     GetPrivateProfileStringW(L"settings", L"strength", L"", buf, 32, g_settingsFile.c_str());
     if (buf[0]) {
@@ -95,7 +93,7 @@ void AddOptions()
 int g_cameraUpdates = 0; // in this mission
 bool g_hotkeyWasDown = false;
 
-// Your own hook, for what no loader event covers. It runs before GameClient::UpdateCamera, with the caller's registers.
+// Your own hook, for what no loader event covers. Runs before GameClient::UpdateCamera, with the caller's registers.
 int UpdateCameraPre(DK2ML_Regs* regs, void*)
 {
     void* client = dk2ml::Arg<void*>(regs, 0); // `this`
@@ -109,7 +107,7 @@ int UpdateCameraPre(DK2ML_Regs* regs, void*)
 
 void OnFrame(const DK2ML_Event*, void*)
 {
-    // GetAsyncKeyState also sees keys pressed in other windows, so only listen while the game has focus
+    // GetAsyncKeyState also sees keys pressed in other windows
     bool down = g_api->IsGameFocused() && (GetAsyncKeyState(g_hotkey) & 0x8000) != 0;
 
     if (down && !g_hotkeyWasDown) {

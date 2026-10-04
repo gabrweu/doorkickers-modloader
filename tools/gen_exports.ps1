@@ -1,8 +1,8 @@
 # Generates the dbghelp.dll proxy's exports from System32\dbghelp.dll:
 #   loader/proxy/Exports.asm        one jump stub per export: jmp [g_dbghelpReal + i*8]
 #   loader/proxy/Exports.def        Name=dk2s_<i> @ordinal (same names and ordinals as the real dll)
-#   loader/proxy/ExportNames.inc    the export names, used at startup to fill g_dbghelpReal from the real dll
-# Stub labels are numbered because some dbghelp export names (sym, block, dh...) aren't safe assembler labels.
+#   loader/proxy/ExportNames.inc    the export names; startup fills g_dbghelpReal from the real dll with them
+# Stub labels are numbered: some export names (sym, block, dh...) aren't safe assembler labels.
 param(
     [string]$Source = "$env:SystemRoot\System32\dbghelp.dll",
     [string]$OutDir = "$PSScriptRoot\..\loader\proxy"

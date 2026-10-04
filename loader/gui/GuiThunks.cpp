@@ -1,13 +1,9 @@
-// Plugin GUI callbacks (DK2ML_API::GuiSetCallback) and input capture (CaptureGameInput). No game names or hooks, so
-// guitest runs it with fake actions.
+// GuiSetCallback thunks and CaptureGameInput. No game names or hooks: guitest runs it.
 //
-// An XML <Action type="Callback"> calls its sAction::pCallback as void(const GUI::sAction&), which has no slot for a
-// user pointer, and plugin code must run under crash containment. So each (plugin, fn, user) gets a thunk,
-// `mov rdx, entry; mov rax, Dispatch; jmp rax`, and Dispatch(action, entry) calls the plugin under __try. The game
-// calls pCallback through a pointer, so the call follows the calling convention and rdx is free.
-// Cloning an item copies pCallback, so clones share the thunk; the action's owner says which item it was.
-// Thunks are never freed because items point at them until the GUI reloads. The same (plugin, fn, user) reuses its
-// thunk.
+// pCallback is void(const GUI::sAction&) with no user slot, so each (plugin, fn, user) gets one thunk,
+// `mov rdx, entry; mov rax, Dispatch; jmp rax`; Dispatch calls the plugin under __try. The game calls pCallback
+// through a pointer, so rdx is free. Clones share the thunk; the action's owner names the item. Never freed: items
+// point at thunks until a GUI reload.
 #include "Loader.h"
 
 #include <malloc.h> // _resetstkoflw
@@ -66,7 +62,7 @@ bool IsFaulted(HMODULE owner)
     return faulted;
 }
 
-// The thunks jump here: rcx = the GUI::sAction running, rdx = our entry.
+// Thunk target: rcx = the running GUI::sAction, rdx = our entry.
 void Dispatch(const void* action, const Entry* e)
 {
     if (!action || IsFaulted(e->owner)) {
@@ -109,8 +105,7 @@ void* WriteThunk(const Entry* entry) // under g_lock
     }
 
     DWORD old;
-    // Stays executable while it's written. GuiSetCallback is main-thread only, but a plugin's own thread may call it
-    // anyway while the main thread runs another thunk on this page.
+    // Stays executable: another thread may be running a thunk on this page.
     if (!VirtualProtect(g_thunks, kMaxThunks * kThunkSize, PAGE_EXECUTE_READWRITE, &old)) {
         return nullptr;
     }
@@ -156,7 +151,7 @@ void* Gui_CallbackThunk(HMODULE owner, DK2ML_GuiCallbackFn fn, void* user)
     }
     AcquireSRWLockExclusive(&g_lock);
     if (std::find(g_faulted.begin(), g_faulted.end(), owner) != g_faulted.end()) {
-        // A switched-off plugin's own thread may still call this; its thunks would be inert.
+        // A switched-off plugin's thread may still call this; its thunks would be inert.
         ReleaseSRWLockExclusive(&g_lock);
         LogF("%ls: GuiSetCallback refused: it was switched off for this session", Log_ModuleName(owner).c_str());
         return nullptr;

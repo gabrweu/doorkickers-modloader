@@ -1,5 +1,5 @@
-# Formats the C/C++ sources with the repo's .clang-format. -Check only lists the files that need formatting and exits
-# with 1 if there are any. Generated files, vendored code, asm and resource scripts are left alone.
+# Formats the C/C++ sources with .clang-format. -Check only lists files that need it (exit 1 if any). Generated files,
+# vendored code, asm and resource scripts are skipped.
 param([switch]$Check)
 
 $ErrorActionPreference = 'Stop'

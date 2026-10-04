@@ -1,11 +1,10 @@
 # Builds, tests and publishes a loader release: Actions > Release > Run workflow, on the default branch.
-# The version comes from CMakeLists.txt's project(dk2ml VERSION ...); bump it first. The workflow creates the tag
-# v<version> at the built commit, and refuses a version that already has one.
-#   dk2ml-loader-v<version>.zip              for players: dk2ml.dll + dbghelp.dll (its stub) + README.md + LICENSE +
+# Version: CMakeLists.txt's project(dk2ml VERSION ...); bump it first. Tags v<version> at the built commit; refuses a
+# version that already has a tag.
+#   dk2ml-loader-v<version>.zip              players: dk2ml.dll + dbghelp.dll (stub) + README.md + LICENSE +
 #                                            THIRD_PARTY_NOTICES.txt
-#   dk2ml-template-for-devs-v<version>.zip   for modders: template/ at the root, ready to build, with dk2ml\ (headers),
-#                                            tools\ (its build/install/package.ps1 + symtest.exe, disasm.ps1), docs\
-#                                            (ExamplePlugin.cpp, for-agents\) and LICENSE
+#   dk2ml-template-for-devs-v<version>.zip   modders: template/ at the root + dk2ml\, tools\, docs\, LICENSE (see the
+#                                            Package step)
 #   dk2ml-loader-v<version>.sha256.txt       hashes of both zips and the two DLLs, also in the release notes
 name: Release
 
@@ -58,8 +57,8 @@ jobs:
           $templateStage = Join-Path $dist $templateName
           New-Item -ItemType Directory -Force $stage, $templateStage | Out-Null
 
-          # Entries are written one by one with forward slashes: Compress-Archive and ZipFile.CreateFromDirectory in
-          # Windows PowerShell 5 store backslash paths, which some unzip tools mishandle.
+          # Entries one by one, with forward slashes: Windows PowerShell 5's Compress-Archive and
+          # ZipFile.CreateFromDirectory store backslash paths, which some unzip tools mishandle.
           Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
           function Write-Zip($from, $zip) {
               $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
@@ -73,11 +72,11 @@ jobs:
               }
           }
 
-          # The loader zip, for players: the two DLLs, the player guide, the licenses.
+          # The loader zip (players): the two DLLs, the player guide, the licenses.
           Copy-Item (Join-Path $build 'dk2ml.dll'), (Join-Path $build 'dbghelp.dll') $stage
-          # The player guide is the repository's README.md, with the version on top. Relative links only work on GitHub,
-          # so they point at the repository, except LICENSE, which is in the zip. Read and written as UTF-8 (no BOM),
-          # because the README isn't plain ASCII and Windows PowerShell's default encoding is the ANSI code page.
+          # The player guide: README.md with the version on top. Relative links work only on GitHub, so they point at
+          # the repo, except LICENSE (in the zip). UTF-8 without BOM: the README isn't ASCII, and PowerShell 5
+          # defaults to ANSI.
           $utf8 = New-Object System.Text.UTF8Encoding $false
           $readme = [IO.File]::ReadAllText((Join-Path $root 'README.md'), $utf8)
           $readme = $readme.Replace('](../../releases)', "]($repoUrl/releases)")
@@ -90,15 +89,14 @@ jobs:
               (Get-Content (Join-Path $root 'tools\third_party\minhook\LICENSE.txt') -Raw)
           Set-Content (Join-Path $stage 'THIRD_PARTY_NOTICES.txt') $notices -NoNewline
 
-          # The template zip, for modders: template\ at the root, without build output. It builds where it's unzipped,
-          # because CMake finds the headers in dk2ml\ and tools\install.ps1 finds symtest.exe next to it.
+          # The template zip (modders): template\ at the root, no build output. It builds where unzipped: CMake finds
+          # the headers in dk2ml\, tools\install.ps1 finds symtest.exe next to it.
           #   dk2ml\dk2ml.h, dk2ml.hpp   the C API and the optional C++ layer
           #   tools\build.ps1, install.ps1, package.ps1  from template\tools\; they work on the folder above them
-          #   tools\symtest.exe          the dry run and the PDB explorer (--find/--types/--type/--enum)
+          #   tools\symtest.exe          dry run and PDB explorer (--find/--types/--type/--enum)
           #   tools\disasm.ps1           optional disassembly with names (needs LLVM)
           #   docs\ExamplePlugin.cpp     the minimal C example
-          #   docs\for-agents\           the docs, cookbook included, written for coding agents (AGENTS.md and
-          #                              CLAUDE.md at the root point to them)
+          #   docs\for-agents\           docs incl. cookbook, for coding agents (root AGENTS.md/CLAUDE.md point there)
           # symtest.exe doesn't link MinHook, so the MIT LICENSE is the only notice.
           $template = Join-Path $root 'template'
           foreach ($file in Get-ChildItem $template -Recurse -File | Where-Object { $_.FullName -notmatch '\\(build|dist)\\' }) {

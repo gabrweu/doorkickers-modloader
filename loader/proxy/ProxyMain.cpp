@@ -1,15 +1,13 @@
-// dbghelp.dll: the stub that gets the loader into the game. The game statically imports dbghelp.dll by name, so Windows
-// loads this file from the game folder before the exe starts. Every dbghelp export jumps to System32's dbghelp.dll
-// (Exports.asm, RealDbgHelp.cpp). In the game, the stub also loads dk2ml.dll from its own folder, and dk2ml.dll's
-// DllMain does the rest.
+// dbghelp.dll stub. The game statically imports dbghelp.dll, so Windows loads this from the game folder before the exe
+// starts. Every export jumps to System32's dbghelp (Exports.asm, RealDbgHelp.cpp). In the game it also loads dk2ml.dll
+// from its own folder.
 //
-// Nothing passes between the two DLLs but the file name, so either can be updated without the other.
+// The two DLLs share only the file name, so either can be updated alone.
 #include "Loader.h"
 
 namespace {
 
-// Players look in dk2ml.log, and nothing else writes it when dk2ml.dll doesn't load. kernel32 only, because this runs
-// under the loader lock.
+// Nothing else writes dk2ml.log when dk2ml.dll doesn't load. kernel32 only: runs under the loader lock.
 void LogMissing(const wchar_t* dir, DWORD error)
 {
     wchar_t path[MAX_PATH];
@@ -45,13 +43,12 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
 
     DisableThreadLibraryCalls(instance);
 
-    // The real dbghelp, needed in any process that loads this stub. It depends only on core system DLLs, so loading it
-    // from DllMain is safe.
+    // Needed in any process. It depends only on core system DLLs, so loading it from DllMain is safe.
     if (!RealDbghelp_Load()) {
         OutputDebugStringA("[dk2ml] cannot load System32\\dbghelp.dll, dbghelp calls will fail\n");
     }
 
-    // Only the game gets the loader, not some other process that happens to load this dbghelp.
+    // only the game gets the loader
     wchar_t exe[MAX_PATH];
     GetModuleFileNameW(nullptr, exe, MAX_PATH);
     const wchar_t* name = wcsrchr(exe, L'\\');
@@ -59,8 +56,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
         return TRUE;
     }
 
-    // By full path from this file's folder, so the search order can't resolve it elsewhere. dk2ml.dll imports only
-    // system DLLs, so loading it under the loader lock is safe too.
+    // Full path from this file's folder, so the search order can't find another copy. dk2ml.dll imports only system
+    // DLLs, so loading it under the loader lock is safe.
     wchar_t dir[MAX_PATH];
     DWORD n = GetModuleFileNameW(instance, dir, MAX_PATH);
     wchar_t* slash = n && n < MAX_PATH ? wcsrchr(dir, L'\\') : nullptr;

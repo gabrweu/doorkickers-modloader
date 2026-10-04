@@ -1,7 +1,7 @@
-; Test harness for HookTest.cpp: calls a function with every register set to known values and records every register
-; afterwards, like a caller built with link-time code generation that keeps values in volatile registers.
+; HookTest.cpp's harness: calls a function with every register set to known values and records them all afterwards,
+; like an LTCG caller that keeps values in volatile registers.
 
-; HT_State layout, the start of DK2ML_Regs: gpr[16] (rax rbx rcx rdx rsi rdi rbp r8..r15, then rflags), xmm[16]
+; HT_State = the start of DK2ML_Regs: gpr[16] (rax rbx rcx rdx rsi rdi rbp r8..r15, rflags), xmm[16]
 S_RAX = 0
 S_RBX = 8
 S_RCX = 16
@@ -147,7 +147,7 @@ HT_Call PROC
     ret
 HT_Call ENDP
 
-; Targets. Each starts with enough plain instructions for MinHook's 5-byte patch.
+; Targets: each starts with enough plain instructions for MinHook's 5-byte patch.
 
 ALIGN 16
 HT_Nop PROC                                 ; touches nothing
@@ -195,7 +195,7 @@ recurse_done:
     ret
 HT_Recurse ENDP
 
-; Overwrites every register a C function may legally overwrite (what an ordinary detour may do).
+; Overwrites every register a C function may (as a plain detour may).
 ALIGN 16
 HT_Clobber PROC
     mov rax, 0BADBADBADBADBADh

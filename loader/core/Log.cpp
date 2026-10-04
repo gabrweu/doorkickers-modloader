@@ -23,8 +23,7 @@ void LogEchoToStdout(bool on)
     g_echo = on;
 }
 
-// The previous session's log is kept as <name>.prev.log, because players often restart the game after a crash before
-// reporting it.
+// Keeps the previous session's log as <name>.prev.log: players often restart after a crash before reporting it.
 void LogOpen(const std::wstring& path)
 {
     std::wstring previous = path;
@@ -59,7 +58,7 @@ void LogLine(const char* prefix, const char* fmt, va_list args)
 
 bool LogTryF(const char* fmt, ...)
 {
-    // for the crash report's line in dk2ml.log; the crashing thread may be the one holding the lock
+    // crash report: never waits; the crashing thread may hold the lock
     char msg[1024];
     va_list args;
     va_start(args, fmt);

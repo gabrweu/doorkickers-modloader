@@ -1,9 +1,6 @@
-// The GUI kit (DK2ML_API::Gui*): lookups from the GUI root, show/hide, text, the AddChild/SetOrigin actions, the child
-// list walk and Callback actions, all through the game's own functions and actions. The layouts and names live here,
-// so a game update is fixed in one place.
-// Also the game window, the game version, and the loader's one consumer of the game's GUI events. It takes plugins'
-// SubscribeGuiEvent ids and event 219 (GUI_GAME_last). The game has no consumer for 219, so the Native mods screen's
-// widgets send <Action type="TriggerEvent" target="GUI_GAME_last" iParam="N"/> and OnGameEvent passes it to the screen.
+// The GUI kit (DK2ML_API::Gui*) via the game's own functions and actions; its layouts and names live only here.
+// Also the game window, the game version, and the one GUI event consumer: SubscribeGuiEvent ids and 219
+// (GUI_GAME_last: no game consumer, so the Native mods screen's widgets use it).
 #include "Loader.h"
 
 #include <algorithm>
@@ -34,7 +31,7 @@ const void* VtableOf(const void* item)
     return *static_cast<const void* const*>(item);
 }
 
-// Runs a hand-built GUI::sAction, the same as an XML <Action> owned by `owner`. params must outlive the call.
+// Runs a hand-built GUI::sAction like an XML <Action> owned by `owner`. params must outlive the call.
 void RunAction(int64_t type, void* owner, void* target, const char* params)
 {
     std::vector<char> action(kit.actionSize, 0);
@@ -46,10 +43,9 @@ void RunAction(int64_t type, void* owner, void* target, const char* params)
     kit.ActionExecute(action.data());
 }
 
-// --- the game's GUI events: one consumer for every id someone wants ---
+// --- the game's GUI events ---
 
-// The game calls consumer->vtable[0](consumer, eventId, params). IEventConsumer::OnEvent returns void, and
-// EventSystem::TriggerEvent calls every consumer of the id (newest first), so no consumer can stop an event.
+// vtable slot 0. Returns void: no consumer can stop an event.
 void OnGameEvent(void*, unsigned id, void* params)
 {
     if (id == static_cast<unsigned>(off.eventGameLast) && off.eventGameLast > 0) {
@@ -68,7 +64,7 @@ struct Consumer {
 void* const g_consumerVtable[] = {reinterpret_cast<void*>(&OnGameEvent)};
 Consumer g_consumer = {g_consumerVtable};
 
-// the game's main window: this process's largest visible top-level window without an owner
+// the game window: this process's largest visible unowned top-level window
 BOOL CALLBACK FindLargest(HWND hwnd, LPARAM param)
 {
     DWORD pid = 0;
@@ -108,8 +104,7 @@ void GuiKit_Init()
 
 void GuiKit_OnGuiLoaded(bool screen)
 {
-    // GUIManager::Load emptied the game's consumer table (EventSystem::Destroy + Init): register again every load.
-    // GameGUI registers for its events after Load returns, so its handlers run before this consumer.
+    // Load wiped the consumer table: register every load. GameGUI registers after Load returns, so it runs first.
     if (!svc.eventSystem || !*svc.eventSystem || !svc.RegisterConsumer) {
         return;
     }
@@ -143,7 +138,7 @@ bool GuiKit_GuiEventsAvailable()
 
 uint32_t GuiKit_GameVersion()
 {
-    static const uint32_t version = FindGameVersion(); // the code doesn't change, so look once (any thread)
+    static const uint32_t version = FindGameVersion(); // once (any thread); the code doesn't change
     return version;
 }
 
@@ -198,8 +193,7 @@ int Gui_Children(void* item, void** out, int max)
         return 0;
     }
 
-    // m_children is the head node of an intrusive circular list; each child's own node (a LinkedList<GUI::Item> base)
-    // points back to it through `owner`. Walked the way GUI::ItemList::Init walks it.
+    // m_children heads an intrusive circular list; each child's node has `owner` = the child (GUI::ItemList::Init).
     char* list = &Field<char>(item, kit.itemChildren);
     void* head = Field<void*>(list, kit.linkHead);
     void* node = Field<void*>(list, kit.linkNext);
@@ -273,7 +267,7 @@ DK2ML_Status Gui_SetOrigin(void* item, float x, float y)
     if (!item || !Ready()) {
         return DK2ML_ERROR;
     }
-    char params[64]; // the action parses it with "%f %f" during the call
+    char params[64]; // parsed with "%f %f" during the call
     snprintf(params, sizeof(params), "%.2f %.2f", x, y);
     RunAction(kit.setOrigin, item, item, params);
     return DK2ML_OK;

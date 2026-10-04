@@ -1,13 +1,12 @@
-// The PDB explorer and plugin dry run, shipped in the template zip's tools\. It runs the loader's symbol lookups
-// against DoorKickers2.exe/.pdb outside the game.
+// PDB explorer and plugin dry run (shipped in the template zip's tools\): the loader's symbol lookups against
+// DoorKickers2.exe/.pdb, outside the game.
 // usage: symtest.exe [<game dir>] [<plugin.dll>]
-//   always: checks the loader's own names (Native mods menu, events, crash handler, GUI kit, input capture, GUI
-//   events, WINDOW_RESIZED, mod list) and prints the game version
-//   with a plugin: then dry-runs its DK2ML_PluginInit with real lookups and stubbed hooks (nothing is patched).
-//   Exit code: init's result, or 100 if init returned 0 but made calls the real loader would refuse.
+//   always: checks the loader's own names and prints the game version
+//   with a plugin: dry-runs its DK2ML_PluginInit with real lookups and stubbed hooks (nothing is patched). Exit code:
+//   init's result, or 100 if init returned 0 but made calls the real loader would refuse.
 // explorer: symtest.exe <game dir> --find <mask> | --types <mask> | --type <name> | --enum <name>
-//   functions/globals (with the decorated name of each overload), type names, a type's layout, an enum's values
-// symtest.exe <game dir> --check-index [samples]: compares the loader's name index with dbghelp's per-call answers
+//   functions/globals (decorated name per overload), type names, a type's layout, an enum's values
+// symtest.exe <game dir> --check-index [samples]: the loader's name index vs dbghelp's per-call answers
 #include "../loader/Loader.h"
 #include "../loader/gui/GameUi.h"
 
@@ -21,7 +20,7 @@ namespace {
 
 const wchar_t* g_gameDir = L"";
 int g_problems = 0; // calls the real loader would refuse
-std::map<void*, int> g_safeHooks; // target -> callbacks on it, the loader's own included
+std::map<void*, int> g_safeHooks; // target -> callback count, the loader's own included
 
 void Problem(const char* fmt, ...)
 {
@@ -113,7 +112,7 @@ const void* StubGetInterface(const char* name, uint32_t, uint32_t* versionOut)
         *versionOut = 0;
     }
 
-    // the dry run only calls init, where the real loader always says NULL
+    // the dry run only calls init, where GetInterface is always NULL
     Problem("GetInterface(\"%.63s\") during init always returns NULL: look it up from the PLUGINS_LOADED event",
             name ? name : "");
     return nullptr;
@@ -128,7 +127,7 @@ DK2ML_Status StubAddTask(DK2ML_TaskFn fn, void*)
         return DK2ML_ERROR;
     }
 
-    ++g_tasks; // not run, because a dry run has no frames
+    ++g_tasks; // never run: a dry run has no frames
     return DK2ML_OK;
 }
 
@@ -151,7 +150,7 @@ DK2ML_Status StubSubscribeGuiEvent(uint32_t id, DK2ML_EventFn fn, void*)
     return DK2ML_OK;
 }
 
-// A dry run has no GUI, because init runs before the game loads it. GUI kit lookups find nothing and actions fail.
+// No GUI in a dry run (init runs before the game loads it): lookups find nothing, actions fail.
 int g_guiCalls = 0;
 
 void* StubGuiFind(void*, const char*)
@@ -241,7 +240,7 @@ const wchar_t* TestConfigDir()
     return dir.c_str();
 }
 
-// Field by field, so nothing depends on the order. The assert catches a field added to DK2ML_API but not here.
+// Field by field, independent of order. The assert catches a new DK2ML_API field missing here.
 static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, IsGameMenuOpen) + sizeof(void*),
               "DK2ML_API grew: fill the new fields");
 
@@ -288,7 +287,7 @@ DK2ML_API MakeTestApi()
     return api;
 }
 
-// --- explorer: what the PDB knows, without LLVM or text dumps ---
+// --- explorer: the PDB without LLVM or text dumps ---
 
 std::string Narrow(const wchar_t* w)
 {
@@ -298,7 +297,7 @@ std::string Narrow(const wchar_t* w)
     return s;
 }
 
-// padded to one width, so the names line up
+// one width, so the names line up
 const char* KindLabel(const FoundSymbol& f)
 {
     if (f.kind == FoundSymbol::Function) {
@@ -397,7 +396,7 @@ int ListEnum(const std::string& name)
     return 0;
 }
 
-// Compares the loader's name index (Symbols.cpp) with dbghelp's slow per-call answers; takes about a minute.
+// The name index (Symbols.cpp) vs dbghelp's slow per-call answers; about a minute.
 int CheckIndex(const std::string& arg)
 {
     size_t samples = arg.empty() ? 150 : strtoul(arg.c_str(), nullptr, 10);
@@ -447,7 +446,7 @@ const char* OkOrMissing(bool ok)
     return ok ? "ok" : "MISSING";
 }
 
-// a few lookups of each kind, so a broken PDB shows at once
+// a few lookups of each kind: a broken PDB shows at once
 void PrintSampleLookups()
 {
     const char* syms[] = {"GameClient::UpdateCamera",
@@ -463,7 +462,7 @@ void PrintSampleLookups()
     printf("GUI::sAction size %u, action @%d\n", Symbols_TypeSize("GUI::sAction"),
            Symbols_FieldOffset("GUI::sAction", "action"));
 
-    // one of each warning plugins get: an overloaded name and a bitfield (_UNWIND_INFO::Flags is bits 3-7 of byte 0)
+    // one of each plugin warning: overload, bitfield (_UNWIND_INFO::Flags: bits 3-7 of byte 0)
     printf("%-45s %p\n", "GUI::Item::FindChild (overloaded)", Symbols_Resolve("GUI::Item::FindChild"));
     printf("_UNWIND_INFO::Flags (bitfield) @%d\n", Symbols_FieldOffset("_UNWIND_INFO", "Flags"));
 
@@ -474,7 +473,6 @@ void PrintSampleLookups()
     }
 }
 
-// the loader's own "Native mods" menu
 void CheckLoaderMenu()
 {
     bool menuOk = gameui::Resolve();
@@ -487,20 +485,19 @@ void CheckLoaderMenu()
         return;
     }
 
-    // the functions the loader hooks: a folded one would run the menu code for unrelated calls
+    // a folded hook target would run the menu code for unrelated calls
     int shared = Symbols_WarnIfShared(gameui::fn.imguiRender, "loader") +
                  Symbols_WarnIfShared(gameui::fn.guiLoad, "loader") +
                  Symbols_WarnIfShared(reinterpret_cast<void*>(gameui::fn.MergeItemsFromXML), "loader");
     printf("loader hook targets: %s\n", shared == 3 ? "each is a single function" : "FOLDED, see above");
 
-    // in the game the loader's own hooks take a place in these functions' chains too
+    // in the game, the loader's own hooks are in these chains too
     for (void* own :
          {gameui::fn.imguiRender, gameui::fn.guiLoad, reinterpret_cast<void*>(gameui::fn.MergeItemsFromXML)}) {
         ++g_safeHooks[own];
     }
 }
 
-// the plugins' events
 void CheckEvents()
 {
     gameui::ResolveEvents();
@@ -528,7 +525,6 @@ void CheckCrashHandler()
     printf("crash reports: CreateMiniDump %s\n", status);
 }
 
-// the GUI kit, input capture, GUI events, WINDOW_RESIZED, the game version
 void CheckServices()
 {
     bool kitOk = gameui::ResolveKit();
@@ -554,8 +550,7 @@ void CheckServices()
     printf("game version: %u\n", gameui::FindGameVersion());
 }
 
-// The game's active mod list, which Plugins_SyncEnabled compares with the loaded mods on each GUI load. The exe is
-// only mapped here, so the list is empty.
+// The game's active mod list (Plugins_SyncEnabled). Empty here: the exe is only mapped.
 void CheckModList(HMODULE exe)
 {
     bool modListOk = gameui::ResolveModList();
@@ -584,7 +579,7 @@ void CheckLoaderNames(HMODULE exe)
 
 // --- the dry run ---
 
-// The plugin's manifest, read from the file the way the loader does (before any of it runs).
+// Read from the file as the loader does, before any plugin code runs.
 void CheckManifest(const std::wstring& plugin)
 {
     PluginManifest manifest;
@@ -610,8 +605,7 @@ void CheckManifest(const std::wstring& plugin)
     }
 }
 
-// Runs the plugin's init with real lookups and stubbed hooks. Returns init's result, or 100 if init returned 0 but
-// made calls the real loader would refuse.
+// Returns init's result, or 100 if init returned 0 but made calls the real loader would refuse.
 int DryRun(const std::wstring& gameDir, const std::wstring& plugin)
 {
     g_gameDir = gameDir.c_str();
@@ -667,7 +661,7 @@ int wmain(int argc, wchar_t** argv)
 
     LogOpen(L"symtest.log");
     bool explore = argc > 2 && wcsncmp(argv[2], L"--", 2) == 0;
-    // warnings (duplicate types, folded functions) show here too; the explorer prints only answers
+    // warnings (duplicate types, folded code) echo too, except in the explorer
     LogEchoToStdout(!explore);
     RealDbghelp_Load();
     if (!Symbols_Init(gameDir, exe)) {
@@ -681,7 +675,6 @@ int wmain(int argc, wchar_t** argv)
 
     CheckLoaderNames(exe);
 
-    // with a plugin: dry-run its init
     if (argc > 2) {
         return DryRun(gameDir, argv[2]);
     }

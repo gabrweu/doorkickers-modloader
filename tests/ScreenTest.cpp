@@ -1,6 +1,5 @@
-// Checks the generated "Native mods" screen XML (loader/gui/nativemods/NativeModsScreenXml.cpp) without the game:
+// The generated "Native mods" screen XML (loader/gui/nativemods/NativeModsScreenXml.cpp) without the game:
 // well-formed, mod text escaped, names unique, every widget reachable by its events.
-// usage: screentest.exe   (prints "all passed", exit code 0)
 #include <cstdio>
 #include <map>
 #include <regex>
@@ -106,7 +105,7 @@ bool WellFormed(const std::string& xml, std::string* error)
     return true;
 }
 
-// the generated screen and button, and how often each item name occurs in them
+// the generated screen and button, with a count per item name
 struct Screen {
     std::vector<sx::Page> pages;
     sx::Result r;
@@ -170,7 +169,7 @@ void TestWellFormed(const Screen& s)
     }
     Expect("generated XML is well-formed", wellFormed);
 
-    // every widget: 3 select + 1 + 2 buttons + 1 button + 6 options (the header has none)
+    // 3 select + 1 + 2 buttons + 1 button + 6 options (the header has none)
     Expect("one widget per page, button and non-header option", s.r.widgets.size() == 3 + 1 + 2 + 1 + 6);
 }
 
@@ -289,8 +288,7 @@ void TestWheel(const Screen& s)
     Expect("every list entry and non-slider widget passes the wheel on", scrolls == 2 * (3 + 5));
 }
 
-// the main-menu button: its Show/Hide targets must exist (the game resolves them at load) and be its own icon
-// children or the two screens it switches between
+// Show/Hide targets must exist (resolved at load) and be the button's own icons or the two screens it switches between
 void TestMainMenuButton(const Screen& s)
 {
     const std::string& button = s.button;
@@ -305,7 +303,7 @@ void TestMainMenuButton(const Screen& s)
     Expect("restart: the button has the badge and says why",
            s.names.count(sx::kRestartBadge) == 1 && button.find("Restart the game") != std::string::npos);
 
-    // WellFormed comes first in the chain, as before: it reuses buttonError
+    // WellFormed first: it reuses buttonError
     bool plainOk = WellFormed(plainButton, &buttonError) && plainButton.find(sx::kRestartBadge) == std::string::npos &&
                    plainButton.find("Restart the game") == std::string::npos;
     Expect("no restart: no badge, the usual tooltip", plainOk);

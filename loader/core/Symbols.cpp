@@ -1,5 +1,5 @@
-// Resolves game functions/globals/struct layouts from DoorKickers2.pdb via the real dbghelp (System32).
-// Never link dbghelp.lib here: "dbghelp.dll" in the game folder is the loader's stub (proxy/ProxyMain.cpp).
+// Functions, globals and layouts from DoorKickers2.pdb via System32's dbghelp. Never link dbghelp.lib: the game
+// folder's dbghelp.dll is the stub.
 #include "Loader.h"
 
 #include <oaidl.h> // VARIANT, for TI_GET_VALUE
@@ -16,10 +16,10 @@
 
 namespace {
 
-// Private pseudo process handle so our symbol session doesn't collide with the game's own dbghelp use (crash dumps).
+// Private pseudo handle: keeps our session apart from the game's dbghelp use (crash dumps).
 HANDLE const kSymHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(0xD2D2D2D2));
 
-// SymTagEnum values from DIA's cvconst.h (not part of the Windows SDK)
+// SymTagEnum from DIA's cvconst.h (not in the Windows SDK)
 constexpr DWORD SymTagFunction = 5;
 constexpr DWORD SymTagData = 7;
 constexpr DWORD SymTagPublicSymbol = 10;
@@ -32,15 +32,15 @@ constexpr DWORD SymTagBaseType = 16;
 constexpr DWORD SymTagTypedef = 17;
 constexpr DWORD SymTagBaseClass = 18;
 constexpr DWORD SymTagVTable = 25;
-constexpr DWORD DataIsMember = 7; // DataKind, also from cvconst.h
+constexpr DWORD DataIsMember = 7; // DataKind
 
 constexpr DWORD kSymOptions =
     SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_EXACT_SYMBOLS;
 
-constexpr int kMaxTypeDepth = 16; // base classes followed this deep, then the search gives up
+constexpr int kMaxTypeDepth = 16; // base-class recursion limit
 constexpr int kMaxTypeNameDepth = 8; // pointer/array levels spelled out in a type name
-constexpr int kDefiniteMismatch = 1 << 20; // LayoutMismatch's score for a 32-bit copy: worse than any overlap count
-constexpr size_t kMaxListedNames = 8; // names or addresses a warning lists before "..."
+constexpr int kDefiniteMismatch = 1 << 20; // LayoutMismatch for a 32-bit copy: above any overlap count
+constexpr size_t kMaxListedNames = 8; // per warning, then "..."
 
 // dbghelp is not thread safe
 SRWLOCK g_lock = SRWLOCK_INIT;
@@ -55,7 +55,7 @@ decltype(&SymFromName) pSymFromName;
 decltype(&SymGetTypeFromName) pSymGetTypeFromName;
 decltype(&SymGetTypeInfo) pSymGetTypeInfo;
 
-// optional: every copy of each type, explorer's type search
+// optional: type copies, explorer's type search
 decltype(&SymEnumTypes) pSymEnumTypes;
 // optional: per-call names at an address (fallback, --check-index)
 decltype(&SymEnumSymbolsForAddr) pSymEnumSymbolsForAddr;
@@ -106,7 +106,7 @@ bool IsFunctionSymbol(PSYMBOL_INFO sym)
     return sym->Tag == SymTagFunction || sym->Tag == SymTagPublicSymbol;
 }
 
-// An enumerator's value; false (out unchanged) for a non-integer variant.
+// false (out unchanged) for a non-integer variant
 bool VariantInteger(const VARIANT& v, int64_t* out)
 {
     switch (v.vt) {
@@ -125,14 +125,14 @@ bool VariantInteger(const VARIANT& v, int64_t* out)
     return true;
 }
 
-// A bitfield member: its offset is that of the storage unit it lives in.
+// A bitfield's offset is its storage unit's.
 struct Bitfield {
     bool is = false;
-    DWORD position = 0; // first bit within the storage unit
+    DWORD position = 0; // first bit in the storage unit
     ULONG64 length = 0; // bits
 };
 
-// Searches typeId's data members (recursing into base classes) for fieldName. Returns offset or -1.
+// Searches data members, base classes included. -1: not found.
 int32_t FindField(ULONG typeId, const std::wstring& fieldName, int depth, Bitfield* bits = nullptr)
 {
     if (depth > kMaxTypeDepth) {
@@ -167,7 +167,7 @@ int32_t FindField(ULONG typeId, const std::wstring& fieldName, int depth, Bitfie
 
             DWORD offset = 0;
             if (match && TypeInfo(child, TI_GET_OFFSET, &offset)) {
-                // for a bitfield member, dbghelp gives its length in bits
+                // a bitfield's length is in bits
                 if (bits && TypeInfo(child, TI_GET_BITPOSITION, &bits->position)) {
                     bits->is = TypeInfo(child, TI_GET_LENGTH, &bits->length);
                 }
@@ -205,14 +205,12 @@ bool LookupType(const char* typeName, ULONG* typeId)
     return true;
 }
 
-// Many types exist more than once in the PDB with different layouts: GUI::Button is there at 1512 and 1164 bytes,
-// m_pStaticText at 912 and 600; GameClient at 1078672 and 1021232. The smaller copies are 32-bit layouts (pointers
-// 4 bytes, containers half the size). Nothing guarantees which copy SymGetTypeFromName returns, so every copy is found
-// here and the one that fits this build is chosen (LayoutMismatch). SymEnumTypesByName returns only one copy per name,
-// so every type is enumerated once (about half a second, on the first field or size lookup) and indexed by name.
+// Many types exist several times in the PDB (GUI::Button: 1512 and 1164 bytes; GameClient: 1078672 and 1021232); the
+// smaller copies are 32-bit layouts. SymGetTypeFromName's pick is arbitrary and SymEnumTypesByName returns one copy,
+// so every type is enumerated once (~0.5 s, first lookup) and ChooseType picks the copy that fits.
 struct TypeIndexData {
     std::map<std::string, std::vector<ULONG>> udts; // every copy of each struct/class/union
-    std::set<std::string> enums; // for the explorer's type search
+    std::set<std::string> enums; // explorer's type search
 };
 
 const TypeIndexData& TypeIndex()
@@ -248,7 +246,7 @@ const std::vector<ULONG>& TypeCopies(const char* typeName)
     return it != udts.end() ? it->second : none;
 }
 
-// 8 or 4 if child is a data member (not static) whose type is a pointer, else 0.
+// 8 or 4 for a non-static pointer member, else 0.
 int MemberPointerSize(ULONG child)
 {
     DWORD tag = 0;
@@ -276,9 +274,7 @@ int MemberPointerSize(ULONG child)
     return static_cast<int>(length);
 }
 
-// 8 or 4: the size of the first pointer in the type's data members (base classes included), 0 if it has none.
-// The PDB also holds 32-bit copies of many game types (pointers 4 bytes, every offset after one shifted), which are
-// never the layout the 64-bit game uses.
+// The size of the type's first pointer member (bases included); 0 if none. 4 marks a 32-bit copy.
 int PointerSize(ULONG typeId, int depth)
 {
     if (depth > kMaxTypeDepth) {
@@ -318,7 +314,7 @@ int PointerSize(ULONG typeId, int depth)
     return 0;
 }
 
-// A child's tag, offset and the size of its type; false if dbghelp doesn't give all of them.
+// tag, offset and type size; false if dbghelp lacks any of them
 bool ChildPlacement(ULONG child, DWORD* tag, DWORD* offset, ULONG64* length)
 {
     ULONG type = 0;
@@ -328,7 +324,7 @@ bool ChildPlacement(ULONG child, DWORD* tag, DWORD* offset, ULONG64* length)
     return TypeInfo(child, TI_GET_OFFSET, offset) && TypeInfo(type, TI_GET_LENGTH, length);
 }
 
-// A data member that has storage of its own: not static, not a bitfield (bitfields share their storage).
+// not static, not a bitfield (bitfields share storage)
 bool IsPlainDataMember(ULONG child)
 {
     DWORD kind = 0;
@@ -339,10 +335,9 @@ bool IsPlainDataMember(ULONG child)
     return !TypeInfo(child, TI_GET_BITPOSITION, &bit);
 }
 
-// How badly a copy's layout fits this (64-bit) build: the number of data members and bases that overlap the next one
-// when sized with the type sizes dbghelp gives here, plus one if the last runs past the type's size. A 32-bit copy
-// (containers 16 bytes there, 32 here) overlaps all over. The real one overlaps only where the class itself overlaps
-// members (anonymous unions), which every copy of it shares. A 32-bit pointer counts as a definite mismatch.
+// How badly a copy fits this 64-bit build: members and bases that overlap the next one at this build's type sizes,
+// plus one if the last runs past the type's size. A 32-bit copy overlaps all over; the real one only at anonymous
+// unions, which every copy shares. A 4-byte pointer is a definite mismatch.
 int LayoutMismatch(ULONG typeId)
 {
     if (PointerSize(typeId, 0) == 4) {
@@ -395,8 +390,7 @@ int LayoutMismatch(ULONG typeId)
     return overlaps;
 }
 
-// The copy of a type to use: the one that fits this build best, SymGetTypeFromName's pick on a tie. Also returns
-// the other copies that fit equally well (these must agree with it; anything else is a stale layout).
+// The best-fitting copy; SymGetTypeFromName's pick on a tie. equals: other copies that fit as well (must agree).
 bool ChooseType(const char* typeName, ULONG* typeId, std::vector<ULONG>* equals = nullptr)
 {
     if (!LookupType(typeName, typeId)) {
@@ -428,7 +422,7 @@ bool ChooseType(const char* typeName, ULONG* typeId, std::vector<ULONG>* equals 
     return true;
 }
 
-// Logged once per type (and field).
+// warnings are logged once per key
 bool FirstReport(const std::string& key)
 {
     static std::set<std::string> reported;
@@ -444,14 +438,11 @@ std::string Hex(uint64_t v)
 
 // --- function names by address and addresses by name ---
 //
-// Per-call dbghelp name questions are slow on this PDB, whatever the answer (build 112): SymEnumSymbolsForAddr
-// ~170 ms, SymEnumSymbols(name) ~30 ms. One SymEnumSymbols("*") pass takes ~250 ms. So the first question builds an
-// index of both directions in one pass, and it's kept because the PDB never changes. It serves the folded-code check
-// (every hook), the overload check (every undecorated name), Plugins_LogSharedHooks, the safe-hook target namer
-// (Symbols_NameAt, in skip log lines) and the explorer. The per-call versions are the fallback and the reference
-// symtest --check-index compares the index with.
+// Per-call dbghelp name queries are slow on this PDB (build 112): SymEnumSymbolsForAddr ~170 ms, SymEnumSymbols(name)
+// ~30 ms. One SymEnumSymbols("*") pass (~250 ms) on the first query indexes both directions for the session. The
+// per-call versions are the fallback and --check-index's reference.
 
-// The distinct addresses of the functions named exactly `name`. Call with g_lock held.
+// Distinct addresses of functions named exactly `name`. g_lock held.
 std::vector<DWORD64> AddressesOfSlow(const char* name)
 {
     struct Context {
@@ -468,8 +459,7 @@ std::vector<DWORD64> AddressesOfSlow(const char* name)
         if (!IsFunctionSymbol(sym)) {
             return TRUE;
         }
-        // dbghelp's mask treats '*'/'?' as wildcards and its case handling depends on the symbol options, so compare
-        // exactly
+        // dbghelp's mask has wildcards and option-dependent case
         if (std::string(sym->Name, strnlen(sym->Name, sym->NameLen)) != c->name) {
             return TRUE;
         }
@@ -482,9 +472,8 @@ std::vector<DWORD64> AddressesOfSlow(const char* name)
     return context.addresses;
 }
 
-// Every function name at an address: more than one when the linker folded identical functions into one (ICF keeps one
-// function symbol and a public symbol for every name folded into it). decorated: the publics' decorated names
-// instead. Call with g_lock held.
+// Several names when ICF folded functions (one function symbol, a public per folded name). decorated: the publics'
+// decorated names. g_lock held.
 std::vector<std::string> NamesAtSlow(DWORD64 address, bool decorated)
 {
     struct Context {
@@ -507,7 +496,7 @@ std::vector<std::string> NamesAtSlow(DWORD64 address, bool decorated)
         return TRUE;
     };
 
-    // the function record has only the plain name, so the decorated one comes from the publics alone
+    // the function record has only the plain name
     if (decorated) {
         pSymSetOptions((kSymOptions & ~SYMOPT_UNDNAME) | SYMOPT_PUBLICS_ONLY);
     }
@@ -520,15 +509,15 @@ std::vector<std::string> NamesAtSlow(DWORD64 address, bool decorated)
 
 struct NameIndex {
     bool built = false; // tried
-    bool usable = false; // the pass found functions
+    bool usable = false; // found functions
     std::unordered_map<DWORD64, std::vector<std::string>> namesAt;
     std::unordered_map<std::string, std::vector<DWORD64>> addressesOf;
 };
 
 NameIndex g_plainIndex;
-NameIndex g_decoratedIndex; // only symtest's explorer asks for decorated names
+NameIndex g_decoratedIndex; // symtest's explorer only
 
-// One pass over every function and public symbol, with the same options NamesAtSlow uses. Call with g_lock held.
+// Same options as NamesAtSlow. g_lock held.
 NameIndex& Index(bool decorated)
 {
     NameIndex& index = decorated ? g_decoratedIndex : g_plainIndex;
@@ -539,7 +528,7 @@ NameIndex& Index(bool decorated)
     index.built = true;
     ULONGLONG started = GetTickCount64();
 
-    // the function record's name first, as SymEnumSymbolsForAddr has it; then the publics in the order they come
+    // function record's name first, as SymEnumSymbolsForAddr orders them; then the publics
     struct Context {
         std::unordered_map<DWORD64, std::vector<std::string>> functions, publics;
         std::unordered_map<std::string, std::vector<DWORD64>>* addressesOf;
@@ -609,9 +598,8 @@ std::vector<DWORD64> AddressesOf(const char* name)
     return it != index.addressesOf.end() ? it->second : std::vector<DWORD64>();
 }
 
-// An undecorated name can stand for several functions (overloads, or a static helper of the same name in several
-// files). SymFromName then returns one of them, and which one isn't defined. Checked once per name. Call with g_lock
-// held.
+// An undecorated name can be several functions (overloads, same-named static helpers); SymFromName's pick is
+// undefined. Once per name. g_lock held.
 void WarnIfOverloaded(const char* name, DWORD64 chosen)
 {
     if (!FirstReport(std::string("overloads of ") + name)) {
@@ -693,7 +681,7 @@ bool Symbols_Init(const std::wstring& gameDir, HMODULE exe)
     info.SizeOfStruct = sizeof(info);
     pSymGetModuleInfoW64(kSymHandle, g_base, &info);
     if (info.SymType != SymPdb) {
-        // with SYMOPT_DEFERRED_LOADS the first query loads the pdb; force it now so failures show up here
+        // deferred loads: force the PDB load now so failures show up here
         alignas(SYMBOL_INFO) char buf[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {};
         auto* sym = reinterpret_cast<SYMBOL_INFO*>(buf);
         sym->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -723,7 +711,7 @@ void* Symbols_Resolve(const char* name)
     sym->SizeOfStruct = sizeof(SYMBOL_INFO);
     sym->MaxNameLen = MAX_SYM_NAME;
 
-    // A decorated name ("?Func@Class@@...") picks one exact overload. Those only match with undecoration off.
+    // A decorated name ("?Func@Class@@...") picks one overload; matches only with undecoration off.
     bool decorated = name[0] == '?';
     if (decorated) {
         pSymSetOptions(kSymOptions & ~SYMOPT_UNDNAME);
@@ -764,7 +752,7 @@ int32_t Symbols_FieldOffset(const char* typeName, const char* fieldName)
              typeName, fieldName, bits.position, bits.position + bits.length - 1, offset, bits.length);
     }
 
-    // other copies that fit this build as well, if any, must agree
+    // equally fitting copies must agree
     std::string others;
     for (ULONG copy : equals) {
         int32_t other = FindField(copy, field, 0);
@@ -816,7 +804,7 @@ bool Symbols_EnumValue(const char* enumType, const char* name, int64_t* out)
             continue;
         }
 
-        VARIANT v = {}; // integer variants only, so no VariantClear needed
+        VARIANT v = {}; // integers only: no VariantClear
         if (!TypeInfo(params->ChildId[i], TI_GET_VALUE, &v)) {
             return false;
         }
@@ -896,7 +884,7 @@ bool Symbols_DescribeTry(uintptr_t address, char* out, size_t size)
     if (!g_ready || !address || !pSymFromAddr || !size) {
         return false;
     }
-    // the crash report: the crashing thread may hold the lock (a plugin's lookup), and the heap may be broken
+    // crash report: the crashing thread may hold the lock; the heap may be broken
     if (!TryAcquireSRWLockExclusive(&g_lock)) {
         return false;
     }
@@ -1023,8 +1011,7 @@ int Symbols_CheckIndex(const std::vector<std::string>& names, size_t samples)
         std::sort(slow.begin(), slow.end());
         std::sort(fast.begin(), fast.end());
         if (slow.empty() && !fast.empty()) {
-            // dbghelp's name mask finds nothing for some names (operator+=, `RTTI...', a leading underscore, ...),
-            // and the index finds them
+            // dbghelp's mask misses some names (operator+=, `RTTI...', a leading underscore); the index has them
             ++maskMisses;
             continue;
         }
@@ -1162,8 +1149,7 @@ bool IsDecoratedFormOf(const std::string& decorated, const std::string& plainNam
     return pUnDecorateSymbolName(decorated.c_str(), plain, MAX_SYM_NAME, UNDNAME_NAME_ONLY) && plainName == plain;
 }
 
-// One member of a type for the explorer: a data member, a base class or the vtable pointer. False for anything else
-// (static members, methods, nested types, typedefs).
+// A data member, base class or vtable pointer; false for anything else.
 bool DescribeMember(ULONG child, TypeMember* m)
 {
     DWORD tag = 0;
@@ -1175,7 +1161,7 @@ bool DescribeMember(ULONG child, TypeMember* m)
     if (tag == SymTagData) {
         DWORD kind = 0;
         if (!TypeInfo(child, TI_GET_DATAKIND, &kind) || kind != DataIsMember) {
-            return false; // static members and the like live elsewhere
+            return false; // static
         }
 
         WCHAR* name = nullptr;
@@ -1246,13 +1232,13 @@ std::vector<FoundSymbol> Symbols_Find(const char* mask, size_t limit)
         if (data && sym->Flags & (SYMFLAG_LOCAL | SYMFLAG_PARAMETER | SYMFLAG_REGREL)) {
             return TRUE; // locals of functions, not globals
         }
-        if (!WildcardMatch(c->mask, name.c_str())) { // matched here, case-insensitive, whatever dbghelp's mask rules
+        if (!WildcardMatch(c->mask, name.c_str())) { // our rules, not dbghelp's mask
             return TRUE;
         }
 
         for (auto& f : *c->found) {
             if (f.address == sym->Address && f.name == name) {
-                if (code || data) { // the function/data record says more than the public one
+                if (code || data) { // more specific than the public record
                     f.kind = code ? FoundSymbol::Function : FoundSymbol::Global;
                 }
                 return TRUE;
@@ -1270,7 +1256,7 @@ std::vector<FoundSymbol> Symbols_Find(const char* mask, size_t limit)
     };
     pSymEnumSymbols(kSymHandle, g_base, "*", callback, &context);
 
-    // decorated names (to pick an overload) and folded names, from the public symbols at each address
+    // decorated (overload) and folded names, from the publics at each address
     for (auto& f : found) {
         std::vector<std::string> decorated = NamesAt(f.address, true);
         f.foldedWith = static_cast<int>(NamesAt(f.address, false).size());

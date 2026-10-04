@@ -258,7 +258,7 @@ bool ReadCode(const uint8_t* p, void* out, size_t n)
     }
 }
 
-// `lea rdx, [rip+d]` (48 8D 15 d32) at p pointing at the string "gameVersion"
+// p is `lea rdx, [rip+d]` (48 8D 15 d32) to "gameVersion"
 bool LeaGameVersion(const uint8_t* p)
 {
     uint8_t b[7];
@@ -272,8 +272,7 @@ bool LeaGameVersion(const uint8_t* p)
     return ReadCode(p + 7 + d, text, sizeof(text)) && memcmp(text, "gameVersion", 12) == 0;
 }
 
-// The N of SetAttribute(element, "gameVersion", N) in a save function, or 0. N is a `mov r8d, imm32` (41 B8) next to
-// the lea of the name (build 112: Roster::Save +0xC1).
+// N of SetAttribute(e, "gameVersion", N), or 0: `mov r8d, imm32` (41 B8) near the lea (build 112: Roster::Save +0xC1)
 uint32_t VersionIn(const char* function)
 {
     auto* code = static_cast<const uint8_t*>(Symbols_Resolve(function));
@@ -372,7 +371,7 @@ bool ActiveModPaths(std::vector<std::string>* out)
         return false;
     }
     if (count < 0 || count > 4096 || (count && !entries)) {
-        return false; // not a list this build would have, so trust none of it
+        return false; // not this build's list layout; trust none of it
     }
 
     size_t textSize = std::min<size_t>(modList.entrySize - modList.entryText, 512); // the hash follows the text

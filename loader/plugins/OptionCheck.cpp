@@ -1,5 +1,4 @@
-// The rules for DK2ML_API::AddOption, shared by the loader and symtest's dry run, so the dry run refuses what the real
-// loader would.
+// AddOption's rules, shared with symtest's dry run so it refuses what the loader would.
 #include "Loader.h"
 
 #include <algorithm>
@@ -9,7 +8,7 @@
 
 namespace {
 
-// sizeof(DK2ML_Option): structSize must be at least this, and bytes past it are ignored.
+// The minimum structSize; bytes past sizeof(DK2ML_Option) are ignored.
 constexpr uint32_t kOptionMinSize = offsetof(DK2ML_Option, user) + sizeof(void*);
 
 constexpr int kMaxChoices = 64;          // the refusal text below names it
@@ -54,8 +53,7 @@ const char* Options_Check(const DK2ML_Option* plugin, DK2ML_Option* copy)
 
 std::string Options_SafeFormat(const std::string& format, bool integer)
 {
-    // A mod-supplied format must be one conversion of the right kind plus plain text, because anything else could read
-    // past the arguments.
+    // One conversion of the right kind plus plain text; anything else could read past the arguments.
     const char* fallback = integer ? "%d" : "%.2f";
     const char* allowedTypes = integer ? "di" : "fgeFGE";
     int conversions = 0;

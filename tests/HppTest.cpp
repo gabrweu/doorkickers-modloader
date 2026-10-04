@@ -1,7 +1,5 @@
-// Checks the optional C++ layer (include/dk2ml.hpp) against a fake API: binding resolution, required vs optional names,
-// typed field/global/function access, hooks, events, interfaces, tasks, the GUI wrappers, and the typed
-// argument/result helpers.
-// usage: hpptest.exe   (prints "all passed", exit code 0)
+// include/dk2ml.hpp against a fake API: binding resolution, required vs optional names, typed field/global/function
+// access, hooks, events, interfaces, tasks, the GUI wrappers, typed arguments and results.
 #include "dk2ml.hpp"
 
 #include <cstdarg>
@@ -156,7 +154,7 @@ DK2ML_Status FakeEnable(void*)
     return DK2ML_OK;
 }
 
-// the GUI kit: a fake GUI of one root with one named child
+// GUI kit: one root with one named child
 int g_guiRoot = 0;
 int g_guiChild = 0;
 std::string g_guiText;
@@ -353,19 +351,14 @@ int main()
 {
     const DK2ML_API api = MakeApi();
 
-    // binding resolution: required vs optional names
     CheckResolveAll(&api);
 
-    // typed function/global/field access, hooks, events
     CheckBindings(&api);
 
-    // interfaces and tasks
     CheckInterfacesAndTasks(&api);
 
-    // the GUI kit, input capture, GUI events
     CheckGuiWrappers(&api);
 
-    // typed arguments and results
     CheckTypedArguments();
 
     printf(g_failures ? "%d FAILED\n" : "all passed\n", g_failures);

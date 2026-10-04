@@ -1,14 +1,11 @@
 // Which mod folders may run code, and the player's permission for Workshop code.
 //
-// - Classification: local folders (<save>\mods\, <save>\mods_upload\, <game>\mods_native\) load without asking.
-//   Steam Workshop items need the player's permission, and anything else is skipped. Paths are canonicalized first
-//   (junctions, symlinks, "..").
-// - Consent: Workshop items update by themselves, so "I trust this mod" can only mean "I trust this version". The
-//   answer is stored per item with a fingerprint of its whole native\ folder (dk2ml.ini [workshop]
-//   <itemId>=allow:<sha256> or deny:<sha256>), and a different fingerprint asks again. One prompt at startup lists
-//   every item that's new or changed.
+// - Classification, after canonicalizing: local folders load without asking, Workshop items need permission, the
+//   rest is skipped.
+// - Consent is per version: stored per item with a fingerprint of its native\ folder (dk2ml.ini [workshop]
+//   <itemId>=allow:<sha256> or deny:<sha256>). A new fingerprint asks again, in one startup prompt.
 //
-// This is a heads-up for players, not a security boundary: native code has full access to the PC.
+// A heads-up for players, not a security boundary: native code has full access to the PC.
 #include "Loader.h"
 
 #include <bcrypt.h>
@@ -26,12 +23,12 @@ constexpr wchar_t kSection[] = L"workshop";
 constexpr wchar_t kWorkshopContent[] = L"\\steamapps\\workshop\\content\\1239080\\"; // Door Kickers 2's app id
 constexpr size_t kMaxWorkshopIdDigits = 20; // a Workshop item id is a 64-bit number
 
-constexpr uint64_t kMaxNativeBytes = 256ull << 20; // refuse to fingerprint (and so load) more than this
+constexpr uint64_t kMaxNativeBytes = 256ull << 20; // larger: not fingerprinted, so not loaded
 constexpr size_t kMaxModXmlBytes = 64 << 10; // a title is at the top of mod.xml
-constexpr size_t kMaxTitleBytes = 100; // mod.xml titles are cut here (UTF-8 bytes, after decoding entities)
+constexpr size_t kMaxTitleBytes = 100; // UTF-8 bytes, after decoding entities
 constexpr size_t kSha256Bytes = 32;
 
-constexpr LONG kMaxNtHeaderOffset = 4096; // the NT headers follow the DOS stub; further out is malformed
+constexpr LONG kMaxNtHeaderOffset = 4096; // NT headers follow the DOS stub
 constexpr size_t kMaxEntitySpan = 10; // '&' to ';': the longest valid one is &#x10FFFF;
 
 std::wstring Lower(std::wstring s)
@@ -109,7 +106,6 @@ std::wstring Hex(const unsigned char* bytes, size_t n)
     return s;
 }
 
-// At most maxBytes from the start of the file.
 bool ReadFileHead(const std::wstring& path, size_t maxBytes, std::string* out)
 {
     std::ifstream file(path, std::ios::binary);
@@ -127,7 +123,7 @@ bool IsNameChar(char c)
     return isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == ':' || c == '.';
 }
 
-// The first name="value" in text (any element), as the game's own files write it.
+// The first name="value" in text, any element.
 bool FindAttribute(const std::string& text, const char* name, std::string* value)
 {
     size_t len = strlen(name);
@@ -181,7 +177,7 @@ bool ListRecursive(const std::wstring& root, const std::wstring& rel, std::vecto
             continue;
         }
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-            // a link inside the folder could point anywhere; nothing legitimate needs one
+            // a link could point anywhere; nothing legitimate needs one
             LogF("%ls%ls%ls is a link, refusing the folder", root.c_str(), rel.c_str(), name.c_str());
             ok = false;
         } else if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -209,7 +205,6 @@ bool InImage(DWORD rva, DWORD size, size_t bytes)
     return rva < size && size - rva >= bytes;
 }
 
-// a table of `count` entries of `entrySize` bytes at rva lies inside the image
 bool TableInImage(DWORD rva, DWORD count, size_t entrySize, DWORD size)
 {
     return rva < size && count <= (size - rva) / entrySize;
@@ -240,10 +235,8 @@ bool IsAmd64Image(const IMAGE_NT_HEADERS64* nt)
 }
 
 // No destructors in here (__try).
-// The image is untrusted (a Workshop item before the player answered), so every RVA is checked against the image size,
-// and anything malformed is "not a plugin". manifest gets the DK2ML_PluginManifest export's bytes, up to
-// sizeof(DK2ML_Manifest), or structSize 0 if there is none. Its texts are inline character arrays because a file mapped
-// as a resource isn't relocated.
+// Untrusted image: every RVA is bounds-checked; anything malformed is "not a plugin". manifest gets up to
+// sizeof(DK2ML_Manifest) of the DK2ML_PluginManifest export, or structSize 0.
 bool ReadPluginExports(const BYTE* base, DK2ML_Manifest* manifest)
 {
     memset(manifest, 0, sizeof(*manifest));
@@ -316,7 +309,7 @@ bool ReadPluginExports(const BYTE* base, DK2ML_Manifest* manifest)
     }
 }
 
-// A manifest text: up to its array's size (a full array has no NUL), control characters as spaces, trimmed.
+// up to capacity (a full array has no NUL), control characters as spaces, trimmed
 std::string ManifestText(const char* field, size_t capacity)
 {
     std::string s(field, strnlen(field, capacity));
@@ -349,7 +342,6 @@ bool IsClash(const SupportDll& a, const SupportDll& b)
     return a.hash != b.hash || a.hash.empty();
 }
 
-// XML entities: whether an entity's digits are all decimal (or hex) digits
 bool IsDigitOf(char d, bool hex)
 {
     if (hex) {
@@ -377,8 +369,7 @@ void AppendUtf8(unsigned long cp, std::string* out)
     }
 }
 
-// A numeric character reference without its '&' and ';' ("#65", "#x41"), appended as UTF-8. False (nothing
-// appended) if it isn't one, or names no valid character.
+// A numeric character reference without '&' and ';' ("#65", "#x41"), appended as UTF-8. False if invalid.
 bool DecodeCharRef(const std::string& name, std::string* out)
 {
     if (name.size() <= 1 || name[0] != '#') {
@@ -429,8 +420,6 @@ std::wstring Consent_Canonical(const std::wstring& path)
 
 std::wstring Consent_WorkshopRoot(const std::wstring& canonicalGameDir)
 {
-    // <library>\steamapps\common\DoorKickers2\ -> <library>\steamapps\workshop\content\1239080\. Steam keeps a game's
-    // Workshop items in the game's own library.
     std::wstring dir = WithSlash(canonicalGameDir);
     std::wstring lower = Lower(dir);
     const std::wstring common = L"\\steamapps\\common\\";
@@ -455,8 +444,7 @@ ModSource Consent_Classify(const std::wstring& canonicalDir, const std::vector<s
         }
     }
 
-    // Only the game's own Workshop folder counts. The prompt shows the item's real Steam link, so a lookalike path
-    // elsewhere is Unknown.
+    // Only the game's own Workshop folder: the prompt shows the item's real link, so a lookalike elsewhere is Unknown.
     std::wstring wsRoot = Lower(WithSlash(workshopRoot)); // empty exactly when workshopRoot is
     if (IsStrictlyUnder(dir, wsRoot)) {
         std::wstring rest = dir.substr(wsRoot.size()); // "<id>\"
@@ -485,8 +473,7 @@ bool Consent_ListFiles(const std::wstring& dir, std::vector<NativeFile>* files)
     return true;
 }
 
-// A plugin is a 64-bit DLL that exports DK2ML_PluginInit, checked on the file mapped as an image resource so nothing in
-// it runs. Other DLLs in native\ are its dependencies, which the Windows loader finds in the plugin's folder.
+// Mapped as an image resource, so nothing in it runs. Other DLLs in native\ are its dependencies.
 bool Consent_ReadPlugin(const std::wstring& path, PluginManifest* manifest)
 {
     if (manifest) {
@@ -538,7 +525,7 @@ std::string Consent_ManifestLine(const PluginManifest& m)
 
 std::wstring Consent_Fingerprint(const std::wstring& dir)
 {
-    // every file's relative path + content, in path order: any added, removed, renamed or changed file counts
+    // relative path + content per file, in path order: any change counts
     std::vector<NativeFile> files;
     if (!Consent_ListFiles(dir, &files) || files.empty()) {
         return L"";
@@ -579,8 +566,6 @@ std::wstring Consent_FileHash(const std::wstring& path)
 
 std::vector<DllClash> Consent_FindDllClashes(const std::vector<SupportDll>& dlls)
 {
-    // Windows loads a DLL name once per process. The first mod's copy to load serves every plugin that imports that
-    // name, so with two different files under one name, one plugin runs against the wrong one.
     std::vector<DllClash> clashes;
     for (size_t i = 0; i < dlls.size(); ++i) {
         for (size_t j = i + 1; j < dlls.size(); ++j) {
@@ -612,8 +597,7 @@ std::wstring Consent_ModListKey(const std::wstring& path)
 
 EnabledDiff Consent_DiffEnabled(const std::vector<std::wstring>& known, const std::vector<std::wstring>& now)
 {
-    // Both sides are the game's own strings (options.xml is written from its list), so keys compare them without
-    // file-system calls. Only added folders get resolved, by the caller.
+    // Both sides are the game's own strings, so keys compare without file-system calls. The caller resolves additions.
     std::vector<std::wstring> keys, paths; // paths: as listed (slashes fixed), for resolving
     for (const auto& p : now) {
         std::wstring key = Consent_ModListKey(p);
@@ -642,8 +626,7 @@ EnabledDiff Consent_DiffEnabled(const std::vector<std::wstring>& known, const st
 
 std::string Consent_XmlDecode(const std::string& s)
 {
-    // One pass, left to right, so "&amp;apos;" is the text "&apos;", not an apostrophe. The game writes mod.xml titles
-    // with entities (title="Era&apos;s ..."), and the screen escapes its text again when it builds its XML.
+    // One pass, so "&amp;apos;" stays the text "&apos;". mod.xml titles carry entities (title="Era&apos;s ...").
     static const std::pair<const char*, char> named[] = {
         {"amp", '&'}, {"lt", '<'}, {"gt", '>'}, {"quot", '"'}, {"apos", '\''}};
     std::string out;
@@ -678,8 +661,7 @@ std::string Consent_XmlDecode(const std::string& s)
 
 std::wstring Consent_ModTitle(const std::wstring& modDir)
 {
-    // mod.xml is untrusted (declined Workshop items get here too), so it gets a bounded read and a plain scan. MSVC's
-    // std::regex recurses per character and can overflow the stack on long input.
+    // Untrusted (declined Workshop items too): bounded read, hand scan instead of std::regex.
     std::string xml;
     std::string title;
     if (ReadFileHead(modDir + L"mod.xml", kMaxModXmlBytes, &xml) && FindAttribute(xml, "title", &title)) {

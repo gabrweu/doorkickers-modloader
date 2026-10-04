@@ -1,8 +1,7 @@
-// dk2ml.dll, the loader. The game statically imports dbghelp.dll, and the dbghelp.dll stub in the game folder
-// (proxy/ProxyMain.cpp) loads this from its DllMain, so it runs before the exe's entry point.
+// dk2ml.dll, loaded by the dbghelp.dll stub (proxy/ProxyMain.cpp) before the exe's entry point.
 //
-// DllMain runs under the loader lock, so it only hooks the exe's entry point. The detour loads the symbols and plugins
-// on the main thread before any game code runs, then calls the original entry.
+// DllMain runs under the loader lock, so it only hooks the entry point. The detour loads symbols and plugins on the
+// main thread before any game code runs.
 #include "Loader.h"
 
 #include <malloc.h> // _resetstkoflw
@@ -22,16 +21,15 @@ std::wstring GameDir()
     return dir.substr(0, dir.find_last_of(L'\\') + 1);
 }
 
-// CreateMiniDump is the game's top-level exception filter. WinMain installs it, then patches SetUnhandledExceptionFilter
-// so it can't be replaced. It runs only for unhandled exceptions, on the crashing thread, before the game's dump and
-// message.
+// CreateMiniDump: the game's top-level filter, made irreplaceable by WinMain. Runs on the crashing thread before the
+// game's dump and message.
 int CrashHandlerPre(DK2ML_Regs* regs, void*)
 {
     CrashReport_Write(reinterpret_cast<const EXCEPTION_POINTERS*>(regs->rcx));
     return DK2ML_CALL_ORIGINAL;
 }
 
-// target: CreateMiniDump, null if this game build has none. self: the loader's module, the hook's owner.
+// target: null if this build has no CreateMiniDump.
 bool InstallCrashHook(void* target, HMODULE self)
 {
     if (!target) {
@@ -64,7 +62,7 @@ __declspec(noinline) void StartLoader()
 {
     std::wstring gameDir = GameDir();
     std::wstring ini = gameDir + L"dk2ml.ini";
-    Consent_EnsureIni(ini); // the release is only the two DLLs, so the default dk2ml.ini is written here
+    Consent_EnsureIni(ini); // the release ships no dk2ml.ini
 
     if (GetPrivateProfileIntW(L"loader", L"enabled", 1, ini.c_str()) == 0) {
         LogF("disabled in dk2ml.ini");
@@ -94,16 +92,14 @@ int WINAPI EntryDetour()
     LogOpen(GameDir() + L"dk2ml.log");
     LogF("Door Kickers 2 native mod loader %s, api v%d", DK2ML_VERSION, DK2ML_API_VERSION);
 
-    // If the loader faults while starting (a bug, or a mod file it can't handle), the game starts unmodded, so the
-    // fault can't keep the game from starting. Crashes in a plugin's init are contained in Plugins.cpp and don't reach
-    // this. A crash in a plugin's DllMain does.
+    // A loader fault here starts the game unmodded. Plugin init crashes are contained in Plugins.cpp; a plugin's
+    // DllMain crash lands here.
     DWORD code = 0;
     if (!StartLoaderContained(&code)) {
         if (code == EXCEPTION_STACK_OVERFLOW) {
             _resetstkoflw();
         }
-        // Every hook made before the failure (plugins, the menu) goes back to the original code. That includes the
-        // entry point hook, which is safe because this detour is already running and the trampoline stays valid.
+        // Includes the entry point hook: safe, since this detour is running and the trampoline stays valid.
         MH_DisableHook(MH_ALL_HOOKS);
         LogF("the loader crashed while starting (exception 0x%08lX): native mods are off for this session", code);
         std::wstring text = L"The native mod loader ran into an error while starting, so native mods are off for this "
@@ -146,12 +142,12 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
 
     DisableThreadLibraryCalls(instance);
 
-    // The real dbghelp for the PDB lookups (Symbols.cpp). The stub has already loaded it, so this only takes a reference.
+    // For Symbols.cpp. The stub already loaded it; this takes a reference.
     if (!RealDbghelp_Load()) {
         OutputDebugStringA("[dk2ml] cannot load System32\\dbghelp.dll, no symbols\n");
     }
 
-    // Only hook when loaded by the game (the stub checks this too).
+    // only in the game (the stub checks this too)
     wchar_t exe[MAX_PATH];
     GetModuleFileNameW(nullptr, exe, MAX_PATH);
     const wchar_t* name = wcsrchr(exe, L'\\');

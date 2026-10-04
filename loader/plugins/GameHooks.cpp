@@ -1,9 +1,6 @@
-// The loader's own game hooks. Each game moment plugins care about is hooked once here and passed to Events.cpp and
-// to the Native mods button and screen (gui/nativemods/NativeModsButton.cpp).
-//
-// The frame tick (ImGui::Render) and GUI loading (GUIManager::Load) are hooked even if the menu's names don't
-// resolve, because they also drive the plugins' events. Camera::SetDefaults is hooked for the MAP_LOADED event
-// only when a plugin subscribed to it, because the renderer calls it many times per frame.
+// The loader's own game hooks, each hooked once, feeding Events.cpp and the Native mods button and screen.
+// ImGui::Render and GUIManager::Load are hooked even without the menu (they drive events); Camera::SetDefaults only
+// if MAP_LOADED is subscribed, because the renderer calls it many times per frame.
 #include "Loader.h"
 
 #include "gui/GameUi.h"
@@ -20,8 +17,7 @@ HMODULE Self()
     return self;
 }
 
-// The game applies the Mods menu's changes by reloading its data and GUI in the same process. Its active list is
-// already current, because Mods::SetModAsActive runs on each click. Runs before the screen is built for this load.
+// The game's active list is already current: SetModAsActive runs per click.
 void SyncEnabledMods()
 {
     if (!modList.ok) {
@@ -47,7 +43,7 @@ int GuiLoadPre(DK2ML_Regs*, void*)
 void GuiLoadPost(DK2ML_Regs*, void*)
 {
     Menu_OnGuiLoadEnd();
-    GuiKit_OnGuiLoaded(Menu_Ready()); // Load emptied the event consumers: registers the screen's and plugins' again
+    GuiKit_OnGuiLoaded(Menu_Ready()); // Load wiped the event consumers: register again
     Menu_OnGuiLoaded();
 
     void* client = nullptr;
@@ -65,8 +61,7 @@ int FrameTickPre(DK2ML_Regs*, void*)
     return DK2ML_CALL_ORIGINAL;
 }
 
-// MAP_LOADED: the game resets the view camera with Camera::SetDefaults on every map load, restarts included. The
-// renderer calls it for temporary cameras too, so only the GameClient's camera counts.
+// MAP_LOADED: SetDefaults on GameClient's camera (every map load); the renderer's temporary cameras don't count.
 int SetDefaultsPre(DK2ML_Regs* r, void*)
 {
     r->scratch[0] = r->rcx; // the Camera
@@ -82,8 +77,7 @@ void SetDefaultsPost(DK2ML_Regs* r, void*)
     }
 }
 
-// CaptureGameInput: while a plugin captures, GameGUI::IsAnyMenuOpened returns true, which keeps clicks and keys off
-// the map. IsGameMenuOpen calls it without the captures.
+// CaptureGameInput: IsAnyMenuOpened returns true while anyone captures; IsGameMenuOpen asks without them.
 thread_local bool t_askingGameOnly = false;
 
 int IsAnyMenuOpenedPre(DK2ML_Regs* r, void*)
@@ -95,7 +89,7 @@ int IsAnyMenuOpenedPre(DK2ML_Regs* r, void*)
     return DK2ML_SKIP_ORIGINAL;
 }
 
-// WINDOW_RESIZED: a post on the renderer's resize; the event carries the window's client size from GetClientRect
+// WINDOW_RESIZED: the window's client size (GetClientRect)
 void OnWindowResizedPost(DK2ML_Regs*, void*)
 {
     RECT rect = {};
@@ -120,7 +114,7 @@ bool AnyPluginRunning()
     return anyRunning;
 }
 
-// the game version, and plugins made for another one (shown, not enforced)
+// plugins made for another game version: shown, not enforced
 void LogGameVersion()
 {
     uint32_t version = GuiKit_GameVersion();
@@ -199,14 +193,14 @@ void GameHooks_Init()
     bool resized = resizedWanted && GameHooks_Install(svc.onWindowResized, nullptr, OnWindowResizedPost,
                                                       "GameRenderer::OnWindowResized");
 
-    // CaptureGameInput is a runtime call, so the hook is there whenever plugins run (one cheap check per call)
+    // CaptureGameInput is a runtime call, so hook whenever plugins run
     bool canCapture = svc.isAnyMenuOpened && svc.gameGui;
     if (AnyPluginRunning() && canCapture) {
         g_captureHooked =
             GameHooks_Install(svc.isAnyMenuOpened, IsAnyMenuOpenedPre, nullptr, "GameGUI::IsAnyMenuOpened");
     }
 
-    // a subscribed event this game build can't provide never arrives, so it's logged
+    // a subscribed event this build can't provide never arrives: log it
     struct {
         DK2ML_EventType type;
         bool available;

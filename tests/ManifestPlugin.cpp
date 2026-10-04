@@ -1,8 +1,8 @@
-// Test plugins for the manifest (consenttest, symtest). Built twice:
-//   manifest_plugin.dll   a manifest a loader must not trust: it asks for a future API, its name fills the whole array
-//                         without a terminating NUL, and its texts carry control characters. consenttest checks how it
-//                         is read (cut, cleaned, never run); symtest's dry run reports it as a PROBLEM.
-//   nomanifest_plugin.dll (DK2ML_TEST_NO_MANIFEST) a plugin without one (the manifest is optional)
+// Manifest test plugins (consenttest, symtest), built twice:
+//   manifest_plugin.dll   an untrustworthy manifest: a future API, a name filling the whole array without a NUL, texts
+//                         with control characters. consenttest checks it is cut, cleaned, never run; symtest's dry run
+//                         reports a PROBLEM.
+//   nomanifest_plugin.dll (DK2ML_TEST_NO_MANIFEST) no manifest (it's optional)
 #include "dk2ml.h"
 
 #ifndef DK2ML_TEST_NO_MANIFEST

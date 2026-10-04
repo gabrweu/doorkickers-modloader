@@ -16,11 +16,10 @@ constexpr size_t kTextSize = 64 * 1024;
 char g_text[kTextSize];
 
 constexpr int kMaxFrames = 64;
-constexpr int kMaxPostFrames = 64; // as deep as SafeHook.cpp's side stack (kMaxDepth there)
+constexpr int kMaxPostFrames = 64; // SafeHook.cpp's side-stack depth (kMaxDepth)
 constexpr int kMaxHookOwners = 8; // owners named per hooked function
 constexpr int kMaxStackMods = 8; // distinct mods listed under "Mods' code on the stack"
-// One mod's text from CrashHelpers::ownerOf ("file (mod "title", manifest)"). Every buffer that receives it uses this
-// size, because strcpy_s into a smaller one ends the process before the report is written.
+// ownerOf's text. Every receiving buffer has this size: strcpy_s into a smaller one ends the process.
 constexpr size_t kOwnerText = 512;
 constexpr int kKeepReports = 10;
 
@@ -53,7 +52,7 @@ const char* CodeName(DWORD code)
     return "exception";
 }
 
-// An access violation's first parameter: what the faulting instruction did with the address.
+// An access violation's first parameter.
 const char* AccessKind(ULONG_PTR kind)
 {
     switch (kind) {
@@ -89,7 +88,6 @@ void ModuleName(HMODULE module, char* name, size_t size)
     Narrow(file ? file + 1 : path, name, size);
 }
 
-// The file name of the module containing address, and its base.
 bool ModuleOf(uintptr_t address, uintptr_t* base, char* name, size_t size)
 {
     void* b = nullptr;
@@ -157,8 +155,7 @@ void HookOwners(uintptr_t target, char* out, size_t size)
 }
 
 // No destructors in here (__try).
-// The stack is the current (crashing) thread's own, so every read is checked against its limits, and anything odd ends
-// the walk.
+// Every read is checked against this thread's stack limits; anything odd ends the walk.
 int WalkGuarded(CONTEXT* ctx, CrashFrame* frames, int max, const SafeHookPostFrame* posts, int postCount)
 {
     uintptr_t postEntry = SafeHook_PostEntryAddress();
@@ -192,8 +189,7 @@ int WalkGuarded(CONTEXT* ctx, CrashFrame* frames, int max, const SafeHookPostFra
                 ctx->Rsp = sp + 8;
             }
 
-            // a post-hooked call returns into the loader's SafeHookPostEntry: its real return address is on this
-            // thread's side stack, innermost first
+            // returned into SafeHookPostEntry: the real address is on the side stack, innermost first
             if (ctx->Rip == postEntry) {
                 if (post >= postCount) {
                     break;
@@ -213,7 +209,6 @@ int WalkGuarded(CONTEXT* ctx, CrashFrame* frames, int max, const SafeHookPostFra
     return n;
 }
 
-// Every mod with code on the stack, once each.
 void AddStackMods(const CrashFrame* frames, int count, const CrashHelpers& helpers, CrashText* out)
 {
     char owner[kOwnerText];

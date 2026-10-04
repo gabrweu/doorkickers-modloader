@@ -1,10 +1,10 @@
-// A plugin that crashes the game on purpose, to test the crash report (dk2ml-crash-*.log) in game. Never ship it.
+// Crashes the game on purpose to test the crash report (dk2ml-crash-*.log) in game. Never ship it.
 // Put build\crash_plugin.dll in <game>\mods_native\, start the game, then:
-// - Ctrl+Shift+F12: a thread of this plugin writes to address 0. Plugin threads aren't crash-contained, so the game's
-//   own crash handler runs, and the loader's report is written first.
-// - Ctrl+Shift+F11: the same write inside its FRAME callback, which the loader contains. The plugin is switched off
-//   and the game goes on. A thread of it then tries CreateSafeHook, which must be refused (see dk2ml.log), and its
-//   Native mods page says it crashed and was switched off for this session.
+// - Ctrl+Shift+F12: a plugin thread writes to address 0. Plugin threads aren't contained, so the game's crash handler
+//   runs; the loader's report is written first.
+// - Ctrl+Shift+F11: the same write in its FRAME callback, which is contained: the plugin is switched off and the game
+//   goes on. A plugin thread then tries CreateSafeHook, which must be refused (dk2ml.log); its Native mods page says
+//   it crashed and was switched off for this session.
 // Remove the DLL afterwards.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -16,7 +16,7 @@ DK2ML_PLUGIN_MANIFEST(1, "Crash test (don't ship)", "1.0.0", "dk2ml", "", 112);
 namespace {
 
 const DK2ML_API* g_api = nullptr;
-void* g_target = nullptr; // a function to try hooking after the contained crash
+void* g_target = nullptr; // hooked again after the contained crash
 bool g_fired = false;
 
 DWORD WINAPI CrashThread(void*)

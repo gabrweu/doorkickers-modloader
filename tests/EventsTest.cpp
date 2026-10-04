@@ -1,7 +1,5 @@
-// Checks the plugins' events (loader/plugins/Events.cpp) without the game: subscriptions only during init, order, crash
-// containment per subscriber, STATE_CHANGED only on a change, GUI events by id, tasks (AddTask). Also checks the
-// interfaces (loader/plugins/Interfaces.cpp).
-// usage: eventstest.exe   (prints "all passed", exit code 0)
+// loader/plugins/Events.cpp without the game: subscriptions only during init, order, crash containment per subscriber,
+// STATE_CHANGED only on a change, GUI events by id, AddTask; and loader/plugins/Interfaces.cpp.
 #include "../loader/Loader.h"
 
 #include <cstdio>
@@ -126,7 +124,7 @@ std::string Calls()
     return s;
 }
 
-// subscriptions: only while plugins initialize; leaves Events open for the interfaces section
+// only while plugins initialize; leaves Events open for TestInterfaces
 void TestSubscriptions()
 {
     Expect("Subscribe before plugins initialize is refused",
@@ -160,7 +158,7 @@ void TestSubscriptions()
            Events_Subscribe(kA, DK2ML_EVENT_WINDOW_RESIZED, Resized, nullptr) == DK2ML_OK);
 }
 
-// interfaces: published while plugins initialize, looked up only after
+// published during init, looked up only after
 void TestInterfaces()
 {
     Expect("PublishInterface before init is refused", Interfaces_Publish(kD, "test.Math", 1, &g_table) == DK2ML_ERROR);
@@ -237,7 +235,7 @@ void TestFrames(void* client)
     Expect("an event nobody wants is a no-op", Calls().empty());
 }
 
-// GUI events: by id, every subscriber of that id in order, crash-contained
+// by id, every subscriber of that id in order, crash-contained
 void TestGuiEvents(void* client)
 {
     Expect("Subscribe/SubscribeGui after init are refused",
@@ -268,7 +266,7 @@ void TestGuiEvents(void* client)
     Expect("WINDOW_RESIZED carries the size", Calls() == "r" && g_width == 1920 && g_height == 1080 && g_sizeOk);
 }
 
-// tasks: queued from anywhere, run first thing in the next frame, in order, under crash containment
+// queued from anywhere, run first in the next frame, in order, crash-contained
 void TestTasks(void* client)
 {
     Expect("AddTask(NULL) is refused", Events_AddTask(kA, nullptr, nullptr) == DK2ML_ERROR);
