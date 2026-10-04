@@ -46,6 +46,7 @@ Delete `dk2ml.dll` and `dbghelp.dll` from the game folder (and `dk2ml.ini` and t
 
 ## FOR DEVELOPERS
 For humans, check [docs/overview-for-humans.md](docs/overview-for-humans.md). For robots, [docs/for-agents](docs/for-agents/) should be more interesting.
+There is a template project under [template](template). Also downloadable with each [release](../../releases).
 
 ## License
 Overall, just don't be a dick.
