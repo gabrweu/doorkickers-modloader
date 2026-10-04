@@ -11,8 +11,9 @@ everyday pieces (`src/Plugin.cpp`), the mod folder (`mod/`), and scripts to buil
 | `dk2ml\dk2ml.h`, `dk2ml.hpp` | the loader's C API and the optional C++ layer |
 | `tools\symtest.exe` | the game's symbols explorer and your plugin's dry run (below) |
 | `tools\disasm.ps1` | disassembly of game functions with names (optional, needs [LLVM](https://llvm.org)) |
-| `docs\cookbook.md` | recipes and pitfalls |
 | `docs\ExamplePlugin.cpp` | a minimal plugin in plain C |
+| `docs\for-agents\` | the docs: rules, workflow, symbols, API map, code recipes (`cookbook.md`), troubleshooting. Written for coding agents, readable by people |
+| `AGENTS.md`, `CLAUDE.md` | entry points that coding agents (Claude Code, Codex, Cursor, ...) pick up by themselves |
 | `LICENSE` | the license (MIT) |
 
 ## Start
@@ -38,8 +39,8 @@ tools\symtest.exe "<game folder>" --type Camera                   # a type's fie
 tools\symtest.exe "<game folder>" --enum GameClient::eCGameState  # an enum's values
 tools\symtest.exe "<game folder>" build\my_plugin.dll             # dry run: your DK2ML_PluginInit with nothing hooked
 ```
-The cookbook (`docs\cookbook.md`) has recipes and pitfalls. Among them: a global resolves to the variable's address,
-not its value; how class results are returned; memory ownership; threads and co-op.
+`docs\for-agents\` has the details: the rules (`rules.md`), how names map to code and how class results are returned
+(`symbols.md`), every API call (`api-map.md`), code recipes (`cookbook.md`) and fixes (`troubleshooting.md`).
 
 ## Publishing
 `.\package.ps1` lays out `dist\<name>\` (mod files + `native\<name>.dll`). Copy it to

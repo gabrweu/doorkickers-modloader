@@ -103,7 +103,7 @@ inline bool ResolveAll(const DK2ML_API* api)
 
 // A game function by name, callable: Fn<int(void* self, float x)> f{"Class::Method"}; f(obj, 1.0f).
 // The signature isn't checked. `this` is the first argument. A function returning a class by value takes a hidden
-// pointer to the result after `this` and returns that pointer (see "Calling game functions" in docs\cookbook.md).
+// pointer to the result after `this` and returns that pointer (see "Calling convention" in docs\for-agents\symbols.md).
 template <typename Signature> class Fn;
 
 template <typename R, typename... Args> class Fn<R(Args...)> : public Binding {

@@ -39,6 +39,6 @@ Testing/
 .cache/
 dist/
 re/
-CLAUDE.md
+/CLAUDE.md
 .claude/
 tests/CrashPlugin.cpp

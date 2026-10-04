@@ -1,11 +1,11 @@
 # Builds, tests and publishes a loader release: Actions > Release > Run workflow, on the default branch.
 # The version comes from CMakeLists.txt's project(dk2ml VERSION ...); bump it first. The workflow creates the tag
 # v<version> at the built commit, and refuses a version that already has one.
-#   DK2-NativeModLoader-v<version>.zip          for players: dk2ml.dll + dbghelp.dll (its stub) + README.txt + LICENSE +
+#   DK2-NativeModLoader-v<version>.zip          for players: dk2ml.dll + dbghelp.dll (its stub) + README.md + LICENSE +
 #                                               THIRD_PARTY_NOTICES.txt
 #   DK2-NativeModTemplate-v<version>.zip        for modders: template/ at the root, ready to build, with dk2ml\ (headers),
-#                                               tools\ (symtest.exe, disasm.ps1), docs\ (cookbook.md, ExamplePlugin.cpp)
-#                                               and LICENSE
+#                                               tools\ (symtest.exe, disasm.ps1), docs\ (ExamplePlugin.cpp, for-agents\) and
+#                                               LICENSE
 #   DK2-NativeModLoader-v<version>.sha256.txt   hashes of both zips and the two DLLs, also in the release notes
 name: Release
 
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       game_version:
-        description: Door Kickers 2 version this release is built for (shown in README.txt and the notes)
+        description: Door Kickers 2 version this release is built for (shown in README.md and the notes)
         default: '1.12'
         required: true
 
@@ -75,9 +75,16 @@ jobs:
 
           # The loader zip, for players: the two DLLs, the player guide, the licenses.
           Copy-Item (Join-Path $build 'dk2ml.dll'), (Join-Path $build 'dbghelp.dll') $stage
-          $readme = Get-Content (Join-Path $docs 'players.txt') -Raw
-          $readme = $readme.Replace('@VERSION@', $env:VERSION).Replace('@GAMEVERSION@', $env:GAME_VERSION).Replace('@REPO_URL@', $repoUrl)
-          Set-Content (Join-Path $stage 'README.txt') $readme -NoNewline
+          # The player guide is the repository's README.md, with the version on top. Relative links only work on GitHub,
+          # so they point at the repository, except LICENSE, which is in the zip. Read and written as UTF-8 (no BOM),
+          # because the README isn't plain ASCII and Windows PowerShell's default encoding is the ANSI code page.
+          $utf8 = New-Object System.Text.UTF8Encoding $false
+          $readme = [IO.File]::ReadAllText((Join-Path $root 'README.md'), $utf8)
+          $readme = $readme.Replace('](../../releases)', "]($repoUrl/releases)")
+          $readme = [regex]::Replace($readme, '\]\((?!https?:|#|LICENSE\))([^)]+)\)', "]($repoUrl/blob/HEAD/`$1)")
+          $nl = if ($readme.Contains("`r`n")) { "`r`n" } else { "`n" }
+          $readme = "Door Kickers 2 Native Mod Loader v$env:VERSION, built for Door Kickers 2 $env:GAME_VERSION.$nl$nl" + $readme
+          [IO.File]::WriteAllText((Join-Path $stage 'README.md'), $readme, $utf8)
           Copy-Item (Join-Path $root 'LICENSE') $stage
           $notices = "This software includes MinHook (https://github.com/TsudaKageyu/minhook), used under the following license:`r`n`r`n" +
               (Get-Content (Join-Path $root 'tools\third_party\minhook\LICENSE.txt') -Raw)
@@ -88,8 +95,9 @@ jobs:
           #   dk2ml\dk2ml.h, dk2ml.hpp   the C API and the optional C++ layer
           #   tools\symtest.exe          the dry run and the PDB explorer (--find/--types/--type/--enum)
           #   tools\disasm.ps1           optional disassembly with names (needs LLVM)
-          #   docs\cookbook.md           recipes and pitfalls
           #   docs\ExamplePlugin.cpp     the minimal C example
+          #   docs\for-agents\           the docs, cookbook included, written for coding agents (AGENTS.md and
+          #                              CLAUDE.md at the root point to them)
           # symtest.exe doesn't link MinHook, so the MIT LICENSE is the only notice.
           $template = Join-Path $root 'template'
           foreach ($file in Get-ChildItem $template -Recurse -File | Where-Object { $_.FullName -notmatch '\\(build|dist)\\' }) {
@@ -100,7 +108,8 @@ jobs:
           foreach ($dir in 'dk2ml', 'tools', 'docs') { New-Item -ItemType Directory -Force (Join-Path $templateStage $dir) | Out-Null }
           Copy-Item (Join-Path $root 'include\dk2ml.h'), (Join-Path $root 'include\dk2ml.hpp') (Join-Path $templateStage 'dk2ml')
           Copy-Item (Join-Path $build 'symtest.exe'), (Join-Path $root 'tools\disasm.ps1') (Join-Path $templateStage 'tools')
-          Copy-Item (Join-Path $docs 'cookbook.md'), (Join-Path $docs 'ExamplePlugin.cpp') (Join-Path $templateStage 'docs')
+          Copy-Item (Join-Path $docs 'ExamplePlugin.cpp') (Join-Path $templateStage 'docs')
+          Copy-Item (Join-Path $docs 'for-agents') (Join-Path $templateStage 'docs') -Recurse
           Copy-Item (Join-Path $root 'LICENSE') $templateStage
 
           $zip = Join-Path $dist "$name.zip"
@@ -118,7 +127,7 @@ jobs:
               '',
               "Install: copy ``dk2ml.dll`` and ``dbghelp.dll`` from ``$name.zip`` into the game folder (the one with DoorKickers2.exe).",
               '',
-              "Modders: ``$templateName.zip`` is a plugin project, ready to build where you unzip it, with the headers, symtest.exe, disasm.ps1, the cookbook and a C example. Start with its README.md.",
+              "Modders: ``$templateName.zip`` is a plugin project, ready to build where you unzip it, with the headers, symtest.exe, disasm.ps1, docs and recipes (written for coding agents, readable by people) and a C example. Start with its README.md.",
               '',
               'SHA-256:',
               '```'
