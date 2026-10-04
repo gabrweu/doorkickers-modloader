@@ -4,16 +4,17 @@
 # copies to the same folder but keeps files from earlier installs, so remove anything stale there first. Players also
 # need the Native Mod Loader, so link it on your Workshop page.
 $ErrorActionPreference = 'Stop'
-$name = [regex]::Match((Get-Content (Join-Path $PSScriptRoot 'CMakeLists.txt') -Raw), 'project\((\w+)').Groups[1].Value
+$root = Split-Path $PSScriptRoot -Parent # the project root, one up from tools\
+$name = [regex]::Match((Get-Content (Join-Path $root 'CMakeLists.txt') -Raw), 'project\((\w+)').Groups[1].Value
 
 & (Join-Path $PSScriptRoot 'build.ps1')
-$dist = Join-Path $PSScriptRoot 'dist'
+$dist = Join-Path $root 'dist'
 $mod = Join-Path $dist $name
 if (Test-Path $mod) { Remove-Item -LiteralPath $mod -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $mod 'native') | Out-Null
-Copy-Item (Join-Path $PSScriptRoot 'mod\*') $mod -Recurse
+Copy-Item (Join-Path $root 'mod\*') $mod -Recurse
 $dll = Join-Path $mod "native\$name.dll"
-Copy-Item (Join-Path $PSScriptRoot "build\$name.dll") $dll
+Copy-Item (Join-Path $root "build\$name.dll") $dll
 
 $hash = '{0}  {1}' -f (Get-FileHash $dll -Algorithm SHA256).Hash.ToLower(), (Split-Path $dll -Leaf)
 Set-Content (Join-Path $dist "$name.sha256.txt") $hash

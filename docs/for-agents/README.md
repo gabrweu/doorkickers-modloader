@@ -12,12 +12,13 @@ for coding agents first, people second.
 - Language: C++17 (C works too), MSVC x64, static CRT, Release builds.
 
 ## Where things are
-| What | Template zip (`DK2-NativeModTemplate-v<ver>.zip`) | Loader repository |
+| What | Template zip (`dk2ml-template-for-devs-v<ver>.zip`) | Loader repository |
 |---|---|---|
 | C API, the reference | `dk2ml\dk2ml.h` | `include/dk2ml.h` |
 | C++ layer (bindings, typed args, `gui::`) | `dk2ml\dk2ml.hpp` | `include/dk2ml.hpp` |
 | Plugin source | `src\Plugin.cpp` | `template/src/Plugin.cpp` |
 | Mod folder contents (`mod.xml`, `gui\`) | `mod\` | `template/mod/` |
+| Build, install and package scripts | `tools\build.ps1`, `install.ps1`, `package.ps1` | `template/tools/` |
 | PDB explorer and dry run | `tools\symtest.exe` | built as `build\symtest.exe` |
 | Disassembler script (needs LLVM) | `tools\disasm.ps1` | `tools/disasm.ps1` |
 | Minimal C plugin | `docs\ExamplePlugin.cpp` | `docs/ExamplePlugin.cpp` |
@@ -48,10 +49,10 @@ for coding agents first, people second.
 ## What an agent can and can't verify
 | Can (no game running) | Can't (needs the human) |
 |---|---|
-| Compile (`.\build.ps1`) | Anything in game: behavior, visuals, timing |
+| Compile (`.\tools\build.ps1`) | Anything in game: behavior, visuals, timing |
 | Check every name against the real PDB (`symtest --find/--type/--enum`) | Whether a hook fires when expected |
 | Run `DK2ML_PluginInit` against the real PDB (the dry run) | Crashes after init |
-| Install to `mods_upload` while the game is closed (`.\install.ps1`) | Enabling the mod in the game's Mods menu |
+| Install to `mods_upload` while the game is closed (`.\tools\install.ps1`) | Enabling the mod in the game's Mods menu |
 | Read `dk2ml.log` and crash reports after the human played | Publishing to the Steam Workshop |
 
 The dry run is the strongest check available without the game. A change isn't done until the dry run passes. In-game

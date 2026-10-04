@@ -154,6 +154,6 @@ if (auto* m = dk2ml::Get<MyModApi>(api, "author.mymod.Api", 1)) m->SetZoom(2.0f)
 Naming and lifetime rules: [api-map.md](api-map.md#interfaces).
 
 ## Debug with Visual Studio
-1. `.\build.ps1 -Config RelWithDebInfo`, then install.
+1. `.\tools\build.ps1 -Config RelWithDebInfo`, then install.
 2. The human starts the game and attaches: Visual Studio > Debug > Attach to Process > `DoorKickers2.exe` (R23). Breakpoints in the plugin bind once it's loaded, and game frames have names from the game's PDB.
 3. `api->Log` also goes to the debugger output, so Sysinternals DebugView shows it live.

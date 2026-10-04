@@ -7,7 +7,7 @@ Symptom → cause → fix. Exact output strings are in code spans. `<...>` marks
 |---|---|---|
 | `MSVC x64 build tools not found` | VS 2022 / Build Tools with the C++ workload is not installed | The human installs it |
 | `dk2ml.h/dk2ml.hpp not found in <dir>` | the headers aren't in `dk2ml\` | Restore them from the template zip, or configure with `-DDK2ML_INCLUDE=<folder>` |
-| `Door Kickers 2 is 64-bit; configure with an x64 toolchain` | 32-bit toolchain | Use `.\build.ps1`, which sets up x64 |
+| `Door Kickers 2 is 64-bit; configure with an x64 toolchain` | 32-bit toolchain | Use `.\tools\build.ps1`, which sets up x64 |
 | CMake errors about paths after moving the folder | CMake caches absolute paths | Delete `build\` |
 
 ## Dry run output
@@ -45,7 +45,7 @@ Symptom → cause → fix. Exact output strings are in code spans. `<...>` marks
 | `failed to load <path> (error 193)` | not a 64-bit DLL | Build x64 |
 | `not loading <path>: a plugin named <file> is already loaded from <dir>` | another mod has the same DLL name | Rename the project (R17) |
 | `not loading <path>: it needs plugin API <n>, ...` | the manifest's `minApiVersion` is above the installed loader's | Lower it to the loader's API version, or the human updates the loader |
-| `skipping the native code in <dir>: neither one of your mod folders nor a Door Kickers 2 Workshop item` | installed somewhere the loader doesn't trust | Install with `.\install.ps1` (to `mods_upload`) |
+| `skipping the native code in <dir>: neither one of your mod folders nor a Door Kickers 2 Workshop item` | installed somewhere the loader doesn't trust | Install with `.\tools\install.ps1` (to `mods_upload`) |
 | `workshop item <id> (<title>): declined earlier, its code is not loaded` | the player answered No | Delete that item's line under `[workshop]` in `<game>\dk2ml.ini` to be asked again |
 | `<path> init returned <N>; its hooks are switched off` | init returned non-zero | Run the dry run, which shows why |
 | `<path> crashed during init (exception 0x<code>)` | crash in init, often a null binding or GUI or game access in init | Dry run. Don't touch game objects in init (R12) |

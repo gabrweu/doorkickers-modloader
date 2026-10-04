@@ -32,12 +32,12 @@ Mission starting, GUI reloading, frames, etc relevant. The loader hooks those on
 The game applies Mods-menu changes without restarting. The loader follows along as far as it can: disabling a mod switches its plugins off right away, but newly enabled plugins only load on the next start. The button gets a "!" when a restart is needed. I.e. for loading/unloading DLL mods we need a full restart of the game (not the auto restart from the prompt). Could do a custom `.exe` to avoid this but is what it is for now.
 
 ### Writing a plugin
-Grab `DK2-NativeModTemplate-v<version>.zip` from the releases. It's a CMake project that builds where you unzip it, with the headers, the tools and the docs. The loop:
+Grab `dk2ml-template-for-devs-v<version>.zip` from the releases. It's a CMake project that builds where you unzip it, with the headers, the tools and the docs. The loop:
 
 1. Rename the project in `CMakeLists.txt`. The name ends up on the DLL and the settings folder, so pick something
    unlikely to clash.
-2. `.\build.ps1` to build.
-3. `.\install.ps1` with the game closed. It dry-runs your plugin, then copies it into your `mods_upload` folder.
+2. `.\tools\build.ps1` to build.
+3. `.\tools\install.ps1` with the game closed. It dry-runs your plugin, then copies it into your `mods_upload` folder.
 4. Enable the mod in the game's Mods menu, restart the game, and read `dk2ml.log` in the game folder.
 
 Or just do your own scripts.

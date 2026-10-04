@@ -25,7 +25,7 @@ enables the mod in the game and allows it in a permission prompt (after restart)
 > AI was used both as an assistant in research and to generate most of the code. Claude Code, Opus 5.5.
 
 ## INSTALLATION STEPS (for players)
-1. Download `DK2-NativeModLoader` from [Releases](../../releases) and close the game.
+1. Download `dk2ml-loader` from [Releases](../../releases) and close the game.
 2. Copy `dk2ml.dll` and `dbghelp.dll` into the root folder of Door Kickers 2. To get there, in Steam, right-click Door Kickers 2 > Manage > Browse local files. You're looking for the folder containing the game's `.exe`.
 3. Download mods that require the Modloader from the Steam Workshop.
 4. Open the game, enable the mod you downloaded.

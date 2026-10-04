@@ -6,13 +6,13 @@ template root, the folder with `CMakeLists.txt`, in PowerShell.
 ## 0. One-time setup (new project)
 1. Rename `project(my_plugin ...)` in `CMakeLists.txt` to a distinctive name (R17). It names `build\<name>.dll`, the installed mod folder and the settings folder.
 2. Fill in `mod\mod.xml` (`title`, `description`, `author`, `gameVersion`) and the `DK2ML_PLUGIN_MANIFEST(...)` line at the top of `src\Plugin.cpp`.
-3. Toolchain: Visual Studio 2022 or its Build Tools with the C++ workload (MSVC x64, CMake, Ninja). `build.ps1` finds it through `vswhere`.
+3. Toolchain: Visual Studio 2022 or its Build Tools with the C++ workload (MSVC x64, CMake, Ninja). `tools\build.ps1` finds it through `vswhere`.
 4. Game folder: default `C:\Program Files (x86)\Steam\steamapps\common\DoorKickers2`. If it's elsewhere, ask the human and pass it as shown below.
 
 ## 1. Build
 ```powershell
-.\build.ps1                     # Release (default)
-.\build.ps1 -Config RelWithDebInfo   # with a PDB, for attaching a debugger
+.\tools\build.ps1                           # Release (default)
+.\tools\build.ps1 -Config RelWithDebInfo    # with a PDB, for attaching a debugger
 ```
 - Output: `build\<name>.dll`.
 - Success: exit code 0. Failure: the script throws `build failed (<code>)` after the compiler output.
@@ -44,8 +44,8 @@ at exit 0 (R12). Fixes for each line are in [troubleshooting.md](troubleshooting
 
 ## 3. Install (dev)
 ```powershell
-.\install.ps1                                   # default game folder
-.\install.ps1 -GameDir "D:\Games\DoorKickers2"  # other game folder
+.\tools\install.ps1                                         # default game folder
+.\tools\install.ps1 -GameDir "D:\Games\DoorKickers2"        # other game folder
 ```
 - Preconditions: `build\<name>.dll` exists, and the game is **not running**. Otherwise it throws `Close Door Kickers 2 first (it locks the DLL).` Ask the human to close the game, and never kill it (R23).
 - It runs the dry run first and stops on a non-zero exit (`symtest dry run failed (exit code N)`).
@@ -76,7 +76,7 @@ Loader lines about a plugin, from `dk2ml.log`:
 
 ## 6. Publishing (the human)
 Agents prepare and the human publishes (R24):
-1. `.\package.ps1` builds Release and writes `dist\<name>\` plus `dist\<name>.sha256.txt`.
+1. `.\tools\package.ps1` builds Release and writes `dist\<name>\` plus `dist\<name>.sha256.txt`.
 2. Keep `gameVersion` in `mod\mod.xml` and in the manifest equal to the game version symtest prints (`game version: N`).
 3. The human copies `dist\<name>` to `%LOCALAPPDATA%\KillHouseGames\DoorKickers2\mods_upload\<name>` and uploads it from the game's Mods menu. The Workshop page must say that the mod needs the Door Kickers 2 Native Mod Loader.
 

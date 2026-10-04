@@ -12,16 +12,17 @@ This project is a dk2ml plugin: a native (DLL) mod for *Door Kickers 2: Task For
 | `src\Plugin.cpp` | the plugin. `DK2ML_PluginInit` is the entry point |
 | `mod\` | the mod folder: `mod.xml`, optional `gui\*.xml` |
 | `dk2ml\dk2ml.h`, `dk2ml\dk2ml.hpp` | the loader's API (reference) and the C++ layer. Don't edit them |
+| `tools\build.ps1`, `install.ps1`, `package.ps1` | build, dev install (with a dry run), Workshop layout. Run them from this folder |
 | `tools\symtest.exe` | game symbol explorer and plugin dry run |
 | `docs\for-agents\` | docs for agents: rules, workflow, symbols, API map, cookbook (code recipes), troubleshooting |
 
 ## Commands (PowerShell, from this folder)
 | Step | Command | Done when |
 |---|---|---|
-| Build | `.\build.ps1` | exit 0, `build\<name>.dll` exists |
+| Build | `.\tools\build.ps1` | exit 0, `build\<name>.dll` exists |
 | Dry run | `tools\symtest.exe "<game folder>" build\<name>.dll` | prints `plugin init returned 0` and exits 0 |
 | Check a name | `tools\symtest.exe "<game folder>" --find "<mask>"` (`--type`, `--enum`, `--types`) | the name is listed |
-| Install (game closed) | `.\install.ps1 [-GameDir "<game folder>"]` | `Installed to ...` |
+| Install (game closed) | `.\tools\install.ps1 [-GameDir "<game folder>"]` | `Installed to ...` |
 
 The default game folder is `C:\Program Files (x86)\Steam\steamapps\common\DoorKickers2`. `<name>` is
 `project(<name> ...)` in `CMakeLists.txt`.

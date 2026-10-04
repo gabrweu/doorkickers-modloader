@@ -1,12 +1,12 @@
 # Builds, tests and publishes a loader release: Actions > Release > Run workflow, on the default branch.
 # The version comes from CMakeLists.txt's project(dk2ml VERSION ...); bump it first. The workflow creates the tag
 # v<version> at the built commit, and refuses a version that already has one.
-#   DK2-NativeModLoader-v<version>.zip          for players: dk2ml.dll + dbghelp.dll (its stub) + README.md + LICENSE +
-#                                               THIRD_PARTY_NOTICES.txt
-#   DK2-NativeModTemplate-v<version>.zip        for modders: template/ at the root, ready to build, with dk2ml\ (headers),
-#                                               tools\ (symtest.exe, disasm.ps1), docs\ (ExamplePlugin.cpp, for-agents\) and
-#                                               LICENSE
-#   DK2-NativeModLoader-v<version>.sha256.txt   hashes of both zips and the two DLLs, also in the release notes
+#   dk2ml-loader-v<version>.zip              for players: dk2ml.dll + dbghelp.dll (its stub) + README.md + LICENSE +
+#                                            THIRD_PARTY_NOTICES.txt
+#   dk2ml-template-for-devs-v<version>.zip   for modders: template/ at the root, ready to build, with dk2ml\ (headers),
+#                                            tools\ (its build/install/package.ps1 + symtest.exe, disasm.ps1), docs\
+#                                            (ExamplePlugin.cpp, for-agents\) and LICENSE
+#   dk2ml-loader-v<version>.sha256.txt       hashes of both zips and the two DLLs, also in the release notes
 name: Release
 
 on:
@@ -52,8 +52,8 @@ jobs:
           $docs = Join-Path $root 'docs'
           $dist = Join-Path $root 'dist'
           $repoUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY"
-          $name = "DK2-NativeModLoader-v$env:VERSION"
-          $templateName = "DK2-NativeModTemplate-v$env:VERSION"
+          $name = "dk2ml-loader-v$env:VERSION"
+          $templateName = "dk2ml-template-for-devs-v$env:VERSION"
           $stage = Join-Path $dist $name
           $templateStage = Join-Path $dist $templateName
           New-Item -ItemType Directory -Force $stage, $templateStage | Out-Null
@@ -91,8 +91,9 @@ jobs:
           Set-Content (Join-Path $stage 'THIRD_PARTY_NOTICES.txt') $notices -NoNewline
 
           # The template zip, for modders: template\ at the root, without build output. It builds where it's unzipped,
-          # because CMake finds the headers in dk2ml\ and install.ps1 finds tools\symtest.exe.
+          # because CMake finds the headers in dk2ml\ and tools\install.ps1 finds symtest.exe next to it.
           #   dk2ml\dk2ml.h, dk2ml.hpp   the C API and the optional C++ layer
+          #   tools\build.ps1, install.ps1, package.ps1  from template\tools\; they work on the folder above them
           #   tools\symtest.exe          the dry run and the PDB explorer (--find/--types/--type/--enum)
           #   tools\disasm.ps1           optional disassembly with names (needs LLVM)
           #   docs\ExamplePlugin.cpp     the minimal C example
@@ -139,6 +140,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $name = "DK2-NativeModLoader-v$env:VERSION"
-          gh release create "v$env:VERSION" "dist\$name.zip" "dist\DK2-NativeModTemplate-v$env:VERSION.zip" "dist\$name.sha256.txt" --target $env:GITHUB_SHA `
+          $name = "dk2ml-loader-v$env:VERSION"
+          $templateName = "dk2ml-template-for-devs-v$env:VERSION"
+          gh release create "v$env:VERSION" "dist\$name.zip" "dist\$templateName.zip" "dist\$name.sha256.txt" --target $env:GITHUB_SHA `
               --title "dk2ml v$env:VERSION" --notes-file dist\notes.md

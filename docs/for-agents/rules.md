@@ -30,7 +30,7 @@ Hard rules for dk2ml plugin code. Cite them by number. Each has its reason, so e
 - **R20. Gameplay changes can desync online co-op.** Keep them to single player, or state that every player needs the mod.
 
 ## Build and environment
-- **R21. MUST ship Release builds.** Debug changes `std::` layouts and slows every frame. `.\build.ps1` defaults to Release.
+- **R21. MUST ship Release builds.** Debug changes `std::` layouts and slows every frame. `.\tools\build.ps1` defaults to Release.
 - **R22. MUST pass the dry run before calling a change done:** `plugin init returned 0` and exit code 0. See [workflow.md](workflow.md).
 - **R23. NEVER launch, kill or attach to `DoorKickers2.exe`.** In-game testing is the human's. `install.ps1` refuses to run while the game runs. Ask the human to close it.
 - **R24. NEVER publish or upload** (Steam Workshop, releases). Tell the human what to publish.
