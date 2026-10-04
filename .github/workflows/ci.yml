@@ -1,0 +1,18 @@
+# Builds the loader, symtest, the tests and the test plugins, and runs ctest (the same tests as locally).
+# symtest needs the game, so it isn't a ctest test. tests/CrashPlugin.cpp is local only, so CI doesn't build it.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    # VS 2022 with the C++ workload (MSVC, CMake, Ninja, MASM), found by tools\build.ps1 through vswhere
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        run: .\tools\build.ps1
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

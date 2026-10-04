@@ -1,0 +1,135 @@
+# Builds, tests and publishes a loader release: Actions > Release > Run workflow, on the default branch.
+# The version comes from CMakeLists.txt's project(dk2ml VERSION ...); bump it first. The workflow creates the tag
+# v<version> at the built commit, and refuses a version that already has one.
+#   DK2-NativeModLoader-v<version>.zip          for players: dk2ml.dll + dbghelp.dll (its stub) + README.txt + LICENSE +
+#                                               THIRD_PARTY_NOTICES.txt
+#   DK2-NativeModTemplate-v<version>.zip        for modders: template/ at the root, ready to build, with dk2ml\ (headers),
+#                                               tools\ (symtest.exe, disasm.ps1), docs\ (cookbook.md, ExamplePlugin.cpp)
+#                                               and LICENSE
+#   DK2-NativeModLoader-v<version>.sha256.txt   hashes of both zips and the two DLLs, also in the release notes
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_version:
+        description: Door Kickers 2 version this release is built for (shown in README.txt and the notes)
+        default: '1.12'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  release:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Version
+        run: |
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'project\(dk2ml VERSION ([\d.]+)').Groups[1].Value
+          if (-not $version) { throw 'cannot read the version from CMakeLists.txt' }
+          if (git ls-remote --tags origin "refs/tags/v$version") { throw "v$version already exists: bump project(dk2ml VERSION) in CMakeLists.txt first" }
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "Releasing v$version"
+
+      - name: Build
+        run: .\tools\build.ps1
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package
+        env:
+          GAME_VERSION: ${{ inputs.game_version }}
+        run: |
+          $root = $env:GITHUB_WORKSPACE
+          $build = Join-Path $root 'build'
+          $docs = Join-Path $root 'docs'
+          $dist = Join-Path $root 'dist'
+          $repoUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY"
+          $name = "DK2-NativeModLoader-v$env:VERSION"
+          $templateName = "DK2-NativeModTemplate-v$env:VERSION"
+          $stage = Join-Path $dist $name
+          $templateStage = Join-Path $dist $templateName
+          New-Item -ItemType Directory -Force $stage, $templateStage | Out-Null
+
+          # Entries are written one by one with forward slashes: Compress-Archive and ZipFile.CreateFromDirectory in
+          # Windows PowerShell 5 store backslash paths, which some unzip tools mishandle.
+          Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+          function Write-Zip($from, $zip) {
+              $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+              try {
+                  foreach ($file in Get-ChildItem $from -Recurse -File) {
+                      $entry = $file.FullName.Substring($from.Length + 1).Replace('\', '/')
+                      [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $entry, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+                  }
+              } finally {
+                  $archive.Dispose()
+              }
+          }
+
+          # The loader zip, for players: the two DLLs, the player guide, the licenses.
+          Copy-Item (Join-Path $build 'dk2ml.dll'), (Join-Path $build 'dbghelp.dll') $stage
+          $readme = Get-Content (Join-Path $docs 'players.txt') -Raw
+          $readme = $readme.Replace('@VERSION@', $env:VERSION).Replace('@GAMEVERSION@', $env:GAME_VERSION).Replace('@REPO_URL@', $repoUrl)
+          Set-Content (Join-Path $stage 'README.txt') $readme -NoNewline
+          Copy-Item (Join-Path $root 'LICENSE') $stage
+          $notices = "This software includes MinHook (https://github.com/TsudaKageyu/minhook), used under the following license:`r`n`r`n" +
+              (Get-Content (Join-Path $root 'tools\third_party\minhook\LICENSE.txt') -Raw)
+          Set-Content (Join-Path $stage 'THIRD_PARTY_NOTICES.txt') $notices -NoNewline
+
+          # The template zip, for modders: template\ at the root, without build output. It builds where it's unzipped,
+          # because CMake finds the headers in dk2ml\ and install.ps1 finds tools\symtest.exe.
+          #   dk2ml\dk2ml.h, dk2ml.hpp   the C API and the optional C++ layer
+          #   tools\symtest.exe          the dry run and the PDB explorer (--find/--types/--type/--enum)
+          #   tools\disasm.ps1           optional disassembly with names (needs LLVM)
+          #   docs\cookbook.md           recipes and pitfalls
+          #   docs\ExamplePlugin.cpp     the minimal C example
+          # symtest.exe doesn't link MinHook, so the MIT LICENSE is the only notice.
+          $template = Join-Path $root 'template'
+          foreach ($file in Get-ChildItem $template -Recurse -File | Where-Object { $_.FullName -notmatch '\\(build|dist)\\' }) {
+              $target = Join-Path $templateStage $file.FullName.Substring($template.Length + 1)
+              New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+              Copy-Item $file.FullName $target
+          }
+          foreach ($dir in 'dk2ml', 'tools', 'docs') { New-Item -ItemType Directory -Force (Join-Path $templateStage $dir) | Out-Null }
+          Copy-Item (Join-Path $root 'include\dk2ml.h'), (Join-Path $root 'include\dk2ml.hpp') (Join-Path $templateStage 'dk2ml')
+          Copy-Item (Join-Path $build 'symtest.exe'), (Join-Path $root 'tools\disasm.ps1') (Join-Path $templateStage 'tools')
+          Copy-Item (Join-Path $docs 'cookbook.md'), (Join-Path $docs 'ExamplePlugin.cpp') (Join-Path $templateStage 'docs')
+          Copy-Item (Join-Path $root 'LICENSE') $templateStage
+
+          $zip = Join-Path $dist "$name.zip"
+          $templateZip = Join-Path $dist "$templateName.zip"
+          Write-Zip $stage $zip
+          Write-Zip $templateStage $templateZip
+
+          # hashes, for the .sha256.txt and the release notes
+          $hashes = foreach ($f in @($zip, $templateZip, (Join-Path $stage 'dk2ml.dll'), (Join-Path $stage 'dbghelp.dll'))) {
+              '{0}  {1}' -f (Get-FileHash $f -Algorithm SHA256).Hash.ToLower(), (Split-Path $f -Leaf)
+          }
+          Set-Content (Join-Path $dist "$name.sha256.txt") $hashes
+          $notes = @(
+              "Built for Door Kickers 2 $env:GAME_VERSION.",
+              '',
+              "Install: copy ``dk2ml.dll`` and ``dbghelp.dll`` from ``$name.zip`` into the game folder (the one with DoorKickers2.exe). The zip's README.txt covers the rest: the permission prompt, uninstalling and troubleshooting.",
+              '',
+              "Modders: ``$templateName.zip`` is a plugin project, ready to build where you unzip it, with the headers, symtest.exe, disasm.ps1, the cookbook and a C example. Start with its README.md.",
+              '',
+              'SHA-256:',
+              '```'
+          ) + $hashes + '```'
+          Set-Content (Join-Path $dist 'notes.md') $notes
+          $hashes
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $name = "DK2-NativeModLoader-v$env:VERSION"
+          gh release create "v$env:VERSION" "dist\$name.zip" "dist\DK2-NativeModTemplate-v$env:VERSION.zip" "dist\$name.sha256.txt" --target $env:GITHUB_SHA `
+              --title "Native Mod Loader v$env:VERSION" --notes-file dist\notes.md

@@ -1,0 +1,29 @@
+#include <winver.h>
+
+#include "dk2ml_version.h" // generated from CMakeLists.txt
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION DK2ML_VERSION_NUMBERS
+PRODUCTVERSION DK2ML_VERSION_NUMBERS
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_DLL
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "era"
+            VALUE "FileDescription", "Door Kickers 2 native mod loader: starts dk2ml.dll (dbghelp forwarder)"
+            VALUE "FileVersion", DK2ML_VERSION
+            VALUE "InternalName", "dk2ml_proxy"
+            VALUE "LegalCopyright", "MIT License"
+            VALUE "OriginalFilename", "dbghelp.dll"
+            VALUE "ProductName", "dk2ml"
+            VALUE "ProductVersion", DK2ML_VERSION
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
