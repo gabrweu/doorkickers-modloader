@@ -246,7 +246,7 @@ const std::wstring& Plugins_Ini(); // dk2ml.ini
 std::wstring Plugins_SaveDir(); // %LOCALAPPDATA%\KillHouseGames\DoorKickers2\ (empty if unknown)
 void Plugins_LogSharedHooks(); // after startup: functions hooked by several modules
 
-// crash report (CrashHelpers), alloc-free: the mod owning an address; the native mods section
+// crash report (CrashHelpers), alloc-free: the mod owning an address; the plugins section
 bool Plugins_CrashOwner(uintptr_t address, char* out, size_t size);
 struct CrashText;
 void Plugins_CrashMods(CrashText* out);
@@ -305,7 +305,7 @@ struct CrashFrame {
 struct CrashHelpers { // alloc-free; crashtest fakes them
     bool (*describe)(uintptr_t address, char* out, size_t size); // "Function+0x12"; false if unknown
     bool (*ownerOf)(uintptr_t address, char* out, size_t size); // "x.dll (mod "Title", ...)" for a mod's code
-    void (*mods)(CrashText* out); // the native mods section
+    void (*mods)(CrashText* out); // the plugins section
 };
 
 int Crash_Walk(const CONTEXT& context, CrashFrame* frames, int max); // innermost first, through post hooks
@@ -361,7 +361,7 @@ int64_t GameHooks_GameState(void** gameClient); // GameClient::m_state (-1: unkn
 int GameHooks_IsGameMenuOpen(); // GameGUI::IsAnyMenuOpened without plugins' captures (0 if unknown)
 
 // --- gui/nativemods/NativeModsButton.cpp ---
-// The main-menu "Native mods" button and screen, merged into the GUI as it loads
+// The main-menu Modloader button and screen, merged into the GUI as it loads
 bool Menu_Init(bool hooksReady); // hooksReady: frame tick and GUI load hooked
 bool Menu_Ready();
 void Menu_OnFrame();

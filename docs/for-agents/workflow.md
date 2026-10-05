@@ -55,7 +55,7 @@ at exit 0 (R12). Fixes for each line are in [troubleshooting.md](troubleshooting
 ## 4. In game (the human)
 Ask the human to:
 1. Enable the mod once in the game's Mods menu. A mod enabled after the game started loads its code only at the next start, so restart the game through Steam after enabling it.
-2. Reproduce the behavior. The main menu's **Native mods** screen shows whether each plugin loaded, and why not.
+2. Reproduce the behavior. The main menu's **Modloader** screen shows whether each plugin loaded, and why not.
 3. Close the game and share the relevant lines of `<game folder>\dk2ml.log`, or the whole file.
 
 ## 5. Logs and reports
@@ -78,10 +78,10 @@ Loader lines about a plugin, from `dk2ml.log`:
 Agents prepare and the human publishes (R24):
 1. `.\tools\package.ps1` builds Release and writes `dist\<name>\` plus `dist\<name>.sha256.txt`.
 2. Keep `gameVersion` in `mod\mod.xml` and in the manifest equal to the game version symtest prints (`game version: N`).
-3. The human copies `dist\<name>` to `%LOCALAPPDATA%\KillHouseGames\DoorKickers2\mods_upload\<name>` and uploads it from the game's Mods menu. The Workshop page must say that the mod needs the Door Kickers 2 Native Mod Loader.
+3. The human copies `dist\<name>` to `%LOCALAPPDATA%\KillHouseGames\DoorKickers2\mods_upload\<name>` and uploads it from the game's Mods menu. The Workshop page must say that the mod needs the Door Kickers 2 Modloader.
 
 Checklist:
 - A Release build, a clean dry run (exit 0), tested in game from `mods_upload`.
 - The mod folder: `mod.xml` (`title`, `description`, `gameVersion`), `native\<name>.dll` and its dependencies, an optional `gui\`, and usually a `mod_image.jpg` preview.
-- `DK2ML_PLUGIN_MANIFEST(minApi, name, version, author, url, gameVersion)` filled in. `minApi` is `DK2ML_API_VERSION` of the `dk2ml.h` built with. The loader reads it without running code and shows it on the Native mods screen, in `dk2ml.log` and in crash reports.
-- The Workshop page says the mod needs the Door Kickers 2 Native Mod Loader and links it. Without the loader, a native mod silently does nothing.
+- `DK2ML_PLUGIN_MANIFEST(minApi, name, version, author, url, gameVersion)` filled in. `minApi` is `DK2ML_API_VERSION` of the `dk2ml.h` built with. The loader reads it without running code and shows it on the Modloader screen, in `dk2ml.log` and in crash reports.
+- The Workshop page says the mod needs the Door Kickers 2 Modloader and links it. Without the loader, a plugin silently does nothing.

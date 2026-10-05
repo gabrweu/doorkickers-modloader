@@ -1,6 +1,6 @@
 // The GUI kit (DK2ML_API::Gui*) via the game's own functions and actions; its layouts and names live only here.
 // Also the game window, the game version, and the one GUI event consumer: SubscribeGuiEvent ids and 219
-// (GUI_GAME_last: no game consumer, so the Native mods screen's widgets use it).
+// (GUI_GAME_last: no game consumer, so the Modloader screen's widgets use it).
 #include "Loader.h"
 
 #include <algorithm>

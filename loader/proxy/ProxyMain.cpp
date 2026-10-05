@@ -23,7 +23,7 @@ void LogMissing(const wchar_t* dir, DWORD error)
 
     char line[160];
     int n = sprintf_s(line,
-                      "dk2ml.dll did not load from the game folder (error %lu): native mods are off. Copy it next "
+                      "dk2ml.dll did not load from the game folder (error %lu): plugins are off. Copy it next "
                       "to dbghelp.dll.\r\n",
                       error);
     DWORD written = 0;

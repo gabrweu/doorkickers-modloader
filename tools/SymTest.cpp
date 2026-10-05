@@ -585,7 +585,7 @@ void CheckManifest(const std::wstring& plugin)
     PluginManifest manifest;
     Consent_ReadPlugin(plugin, &manifest);
     if (!manifest.present) {
-        printf("  [dry run] no manifest (optional: DK2ML_PLUGIN_MANIFEST names it on the Native mods screen)\n");
+        printf("  [dry run] no manifest (optional: DK2ML_PLUGIN_MANIFEST names it on the Modloader screen)\n");
         return;
     }
 

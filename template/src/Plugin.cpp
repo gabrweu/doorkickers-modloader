@@ -1,9 +1,9 @@
-// Starting point for a Door Kickers 2 native mod, with the everyday pieces:
+// Starting point for a Door Kickers 2 plugin, with the everyday pieces:
 //   - loader events: every frame, game state changes, map loads (no hooks; any number of mods can listen);
 //   - game functions, fields and enum values by name (dk2ml.hpp), resolved once in DK2ML_PluginInit;
 //   - a safe hook of your own, with typed arguments;
 //   - a hotkey that fires only while the game has focus;
-//   - settings on the "Native mods" screen, saved in the loader's settings folder.
+//   - settings on the Modloader screen, saved in the loader's settings folder.
 // Replace the behavior with yours. Check names with: tools\symtest.exe "<game folder>" --find "GameClient::*"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -12,7 +12,7 @@
 
 #include "dk2ml.hpp"
 
-// Manifest: shown on the Native mods screen, in dk2ml.log and in crash reports; read without running plugin code.
+// Manifest: shown on the Modloader screen, in dk2ml.log and in crash reports; read without running plugin code.
 // First number: the plugin API version needed (DK2ML_API_VERSION of the dk2ml.h built with). Keep the version in step
 // with your releases, and gameVersion with mod.xml.
 DK2ML_PLUGIN_MANIFEST(1, "My Plugin", "1.0.0", "You", "", 112);
@@ -27,7 +27,7 @@ dk2ml::Field<uint8_t> GameClient_m_camera{"GameClient", "m_camera"}; // the view
 dk2ml::Field<float> Camera_m_fov{"Camera", "m_fov"}; // degrees
 dk2ml::Enum StateRunning{"GameClient::eCGameState", "CGAMESTATE_RUNNING"}; // the map is loaded and live
 
-// --- settings: shown on the Native mods screen, saved to <settings folder>\settings.ini ---
+// --- settings: shown on the Modloader screen, saved to <settings folder>\settings.ini ---
 bool g_enabled = true;
 int g_hotkey = VK_F8;
 float g_strength = 1.0f;

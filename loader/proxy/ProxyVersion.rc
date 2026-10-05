@@ -13,7 +13,7 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "era"
-            VALUE "FileDescription", "Door Kickers 2 native mod loader: starts dk2ml.dll (dbghelp forwarder)"
+            VALUE "FileDescription", "Door Kickers 2 Modloader: starts dk2ml.dll (dbghelp forwarder)"
             VALUE "FileVersion", DK2ML_VERSION
             VALUE "InternalName", "dk2ml_proxy"
             VALUE "LegalCopyright", "MIT License"

@@ -1,5 +1,5 @@
 // Minimal dk2ml plugin in plain C: logs camera updates (at most once per interval), with two settings on the
-// "Native mods" screen (main menu > Native mods > your mod).
+// Modloader screen (main menu > Modloader > your mod).
 // Build a 64-bit DLL (MSVC: cl /LD /O2 /I<folder with dk2ml.h> ExamplePlugin.cpp) into <your mod>\native\, enable the
 // mod in the Mods menu, then watch dk2ml.log in the game folder.
 #include <windows.h>

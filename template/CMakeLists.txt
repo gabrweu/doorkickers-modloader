@@ -1,4 +1,4 @@
-# A Door Kickers 2 native mod (dk2ml plugin). Rename the project: it names the DLL, the mod folder tools\install.ps1
+# A Door Kickers 2 plugin (dk2ml). Rename the project: it names the DLL, the mod folder tools\install.ps1
 # and tools\package.ps1 create, and the loader's settings folder (GetConfigDir). Pick a name unlikely to clash with
 # other mods. Builds in the unpacked template zip (headers in dk2ml\).
 cmake_minimum_required(VERSION 3.20)

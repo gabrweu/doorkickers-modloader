@@ -73,7 +73,7 @@ Subscribe in init. Callbacks run on the main thread in subscription order, under
 - Failure: `DK2ML_ERROR` for an unknown type, `GUI_EVENT`, a NULL fn, or a call after init.
 
 ## Options
-Settings on the plugin's page of the main menu's "Native mods" screen, drawn with the game's widgets. `AddOption` is
+Settings on the plugin's page of the main menu's Modloader screen, drawn with the game's widgets. `AddOption` is
 init only and adds in call order. The plugin owns the values. The loader reads `*value` when the screen opens, writes
 it when the player changes it, then calls `onChange`, where the plugin saves.
 
@@ -125,7 +125,7 @@ game build, everything returns NULL, 0, `""` or `DK2ML_ERROR`.
 | Is the game window focused | `api->IsGameFocused()`. Check it before `GetAsyncKeyState`, which sees keys from every window |
 | Is a game menu open (ignores captures) | `api->IsGameMenuOpen()` / `dk2ml::GameMenuOpen(api)` |
 | Keep clicks and keys off the map while your UI is open | `api->CaptureGameInput(1)`, then `0` when closed / `dk2ml::CaptureInput(api, bool)` |
-| Rebindable key | `DK2ML_OPTION_KEY` ([Options](#options)). The Native mods screen marks a key bound by another plugin too with "(also <mod>)", so pick unusual defaults |
+| Rebindable key | `DK2ML_OPTION_KEY` ([Options](#options)). The Modloader screen marks a key bound by another plugin too with "(also <mod>)", so pick unusual defaults |
 | Game window (HWND) | `api->GetGameWindow()`, NULL before it exists |
 
 Hotkey pattern: in `FRAME`, `down = IsGameFocused() && (GetAsyncKeyState(vk) & 0x8000)`. Act on `down && !wasDown`,

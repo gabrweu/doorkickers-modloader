@@ -1,4 +1,4 @@
-# dk2ml: Door Kickers 2 native mod loader
+# dk2ml: Door Kickers 2 Modloader
 dk2ml lets mods for *Door Kickers 2: Task Force North* ship DLLs, making much more complex mods possible.
 
 ### Why?
@@ -9,7 +9,7 @@ The loader takes the place of `dbghelp.dll`, a DLL the game loads at startup, an
 
 The loader changes nothing about how the game plays and modifies no game files. It hooks into relevant game functions in memory and passes them to mods as events.
 
-Native mods are distributed through the Steam Workshop like any other mod. Their code runs only after the player
+Mods with code (plugins) are distributed through the Steam Workshop like any other mod. Their code runs only after the player
 enables the mod in the game and allows it in a permission prompt (after restart). The prompt comes back whenever the mod's code changes.
 
 ------
@@ -32,17 +32,17 @@ enables the mod in the game and allows it in a permission prompt (after restart)
 5. Manually quit the game and restart it through Steam. Restarting via the prompt in the mod page will not load DLLs.
 6. You should see a Windows prompt telling you external code is being loaded. Accept it and play. Profit.
 
-**Native mods screen.** The main menu gets a **Modloader** button on the bottom right, above "Send Feedback". There you'll see all the mods registered with the Modloader; they each have their own tab with settings (if they have any settings to change). 
+**Modloader screen.** The main menu gets a **Modloader** button on the bottom right, above "Send Feedback". There you'll see all the mods registered with the Modloader; they each have their own tab with settings (if they have any settings to change). 
 
 ## Loading mods
 The game applies changes from the normal "Mods menu" without (actually) restarting, but mod code coming from a DLL can only load when the game starts. So:
-- A native mod you disable is switched off right away. Its code stays in memory doing nothing until you quit.
-- A native mod you enable starts working the next time you start the game.
+- A plugin you disable is switched off right away. Its code stays in memory doing nothing until you quit.
+- A plugin you enable starts working the next time you start the game.
 
 The **Modloader** button shows a "!" while a change is waiting for a restart. Its screen also tells you whether each mod's code loaded (and why not), and can open the mod's Workshop page and folders.
 
 ## Uninstalling
-Delete `dk2ml.dll` and `dbghelp.dll` from the game folder (and `dk2ml.ini` and the logs, if you like). The game is back to normal. Native mods keep their settings in `%LOCALAPPDATA%\KillHouseGames\DoorKickers2\dk2ml`.
+Delete `dk2ml.dll` and `dbghelp.dll` from the game folder (and `dk2ml.ini` and the logs, if you like). The game is back to normal. Plugins keep their settings in `%LOCALAPPDATA%\KillHouseGames\DoorKickers2\dk2ml`.
 
 ## For developers
 For humans, check [docs/overview-for-humans.md](docs/overview-for-humans.md). For robots, [docs/for-agents](docs/for-agents/) should be more interesting.

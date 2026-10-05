@@ -50,7 +50,7 @@ Symptom → cause → fix. Exact output strings are in code spans. `<...>` marks
 | `<path> init returned <N>; its hooks are switched off` | init returned non-zero | Run the dry run, which shows why |
 | `<path> crashed during init (exception 0x<code>)` | crash in init, often a null binding or GUI or game access in init | Dry run. Don't touch game objects in init (R12) |
 | `<path> looked up <N> name(s) this game build doesn't have...` | missing names in game | [After a game update](#after-a-game-update) |
-| game shows a message box and starts unmodded | crash in the plugin's `DllMain` or in the loader | Keep `DllMain` empty. The last `loading <path>` line names the DLL. `enabled=0` under `[loader]` in `<game>\dk2ml.ini` starts the game without native mods |
+| game shows a message box and starts unmodded | crash in the plugin's `DllMain` or in the loader | Keep `DllMain` empty. The last `loading <path>` line names the DLL. `enabled=0` under `[loader]` in `<game>\dk2ml.ini` starts the game without plugins |
 
 ## Wrong behavior in game
 | Symptom | Cause | Fix |

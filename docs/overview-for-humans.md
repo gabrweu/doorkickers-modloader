@@ -86,7 +86,7 @@ Everything lives in `loader/`:
 | `proxy/` | the `dbghelp.dll` stub: loads the loader and forwards all 252 real dbghelp exports |
 | `hooks/` | safe hooks: the register-saving stubs and the callback chains |
 | `plugins/` | finding and loading plugins, the API table, events, interfaces, the loader's own game hooks |
-| `gui/` | the Native mods button and screen (built as game GUI XML), and the GUI helpers plugins can use |
+| `gui/` | the Modloader button and screen (built as game GUI XML), and the GUI helpers plugins can use |
 | `safety/` | the Workshop permission prompt and fingerprints, and the crash reports |
 
 Outside of it: `include/` has the public headers, `template/` the plugin project, `tools/` symtest and the build scripts, and `tests/` what `ctest` runs. MinHook is vendored in `tools/third_party/minhook/`.

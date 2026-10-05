@@ -1,7 +1,7 @@
 # Builds Release and lays out the Workshop mod in dist\<name>\ (mod\ + native\<name>.dll), with the DLL's SHA-256 for
 # release notes in dist\<name>.sha256.txt. To publish, copy dist\<name> to
 # %LOCALAPPDATA%\KillHouseGames\DoorKickers2\mods_upload\<name> (remove stale files from install.ps1 first) and upload
-# it from the game's Mods menu. Players also need the Native Mod Loader: link it on your Workshop page.
+# it from the game's Mods menu. Players also need the Modloader: link it on your Workshop page.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent # the project root, one up from tools\
 $name = [regex]::Match((Get-Content (Join-Path $root 'CMakeLists.txt') -Raw), 'project\((\w+)').Groups[1].Value

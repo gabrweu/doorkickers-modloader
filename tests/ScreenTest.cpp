@@ -1,4 +1,4 @@
-// The generated "Native mods" screen XML (loader/gui/nativemods/NativeModsScreenXml.cpp) without the game:
+// The generated Modloader screen XML (loader/gui/nativemods/NativeModsScreenXml.cpp) without the game:
 // well-formed, mod text escaped, names unique, every widget reachable by its events.
 #include <cstdio>
 #include <map>
@@ -118,7 +118,7 @@ struct Screen {
 std::vector<sx::Page> MakePages()
 {
     std::vector<sx::Page> pages(3);
-    pages[0].title = "Native Mod Loader";
+    pages[0].title = "Modloader";
     pages[0].lines = {"Loader 1.2.0"};
     pages[0].buttons = {sx::PageButton::OpenLog};
 

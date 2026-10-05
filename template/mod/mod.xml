@@ -1,6 +1,6 @@
 <Mod
 	title="My Plugin"
-	description="What it does. Requires the Door Kickers 2 Native Mod Loader (dk2ml.dll and dbghelp.dll in the game folder)."
+	description="What it does. Requires the Door Kickers 2 Modloader (dk2ml.dll and dbghelp.dll in the game folder)."
 	author="You"
 	tags="Other"
 	changeNotes=""

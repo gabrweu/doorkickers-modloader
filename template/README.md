@@ -1,6 +1,6 @@
-# Native mod template
+# Plugin template
 
-A starting point for a Door Kickers 2 native mod (a dk2ml plugin): a CMake project, a plugin that shows the
+A starting point for a Door Kickers 2 plugin (a mod with code, run by dk2ml): a CMake project, a plugin that shows the
 everyday pieces (`src/Plugin.cpp`), the mod folder (`mod/`), and scripts to build, test and package it.
 
 ## What's in here
@@ -27,7 +27,7 @@ everyday pieces (`src/Plugin.cpp`), the mod folder (`mod/`), and scripts to buil
    `mods_upload` folder. Enable it once in the game's Mods menu, start the game, and read `dk2ml.log` in the game
    folder.
 
-The game must have the Native Mod Loader (`dk2ml.dll` + `dbghelp.dll`) installed.
+The game must have the Modloader (`dk2ml.dll` + `dbghelp.dll`) installed.
 
 ## Finding your way around the game
 Everything is looked up by name from `DoorKickers2.pdb`, which ships with the game. `tools\symtest.exe` answers
@@ -45,5 +45,5 @@ tools\symtest.exe "<game folder>" build\my_plugin.dll             # dry run: you
 ## Publishing
 `.\tools\package.ps1` lays out `dist\<name>\` (mod files + `native\<name>.dll`). Copy it to
 `%LOCALAPPDATA%\KillHouseGames\DoorKickers2\mods_upload\<name>` and upload it from the game's Mods menu. Most mods
-also ship a `mod_image.jpg` preview in the mod folder. On the Workshop page, tell players they need the Native Mod
-Loader and link it. Players are asked for permission before your code first runs, and again after each update.
+also ship a `mod_image.jpg` preview in the mod folder. On the Workshop page, tell players they need the Modloader and
+link it. Players are asked for permission before your code first runs, and again after each update.

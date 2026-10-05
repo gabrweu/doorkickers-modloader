@@ -122,7 +122,7 @@ bool FakeOwner(uintptr_t address, char* out, size_t size)
 
 void FakeMods(CrashText* out)
 {
-    out->Add("\r\nNative mods (1):\r\n  \"Fake\": running\r\n");
+    out->Add("\r\nPlugins (1):\r\n  \"Fake\": running\r\n");
 }
 
 const CrashHelpers kFake = {FakeDescribe, FakeOwner, FakeMods};
@@ -218,7 +218,7 @@ void CheckReportText(const char* text, bool show)
     Expect("report: the stack names the frames",
            Contains(text, "#0 ") && Contains(text, "#3 ") && Contains(text, "<- fake.dll"));
     Expect("report: registers, the mods, the main thread",
-           Contains(text, "rip=") && Contains(text, "Native mods (1)") && Contains(text, "the game's main thread"));
+           Contains(text, "rip=") && Contains(text, "Plugins (1)") && Contains(text, "the game's main thread"));
 
     if (show) {
         printf("----\n%s----\n", text);

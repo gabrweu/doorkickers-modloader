@@ -1,5 +1,5 @@
 /*
- * dk2ml.h - Door Kickers 2 native mod loader, plugin API.
+ * dk2ml.h - Door Kickers 2 Modloader, plugin API.
  *
  * A plugin is a 64-bit DLL that exports DK2ML_PluginInit, in one of:
  *   <enabled mod folder>\native\*.dll   loaded while the mod is enabled in the in-game Mods menu
@@ -158,7 +158,7 @@ DK2ML_INLINE void DK2ML_SetResultFloat(DK2ML_Regs* r, float value)
 }
 
 /* --- options ---
- * AddOption settings appear under the mod on the "Native mods" screen (main menu) as game widgets. The plugin owns the
+ * AddOption settings appear under the mod on the Modloader screen (main menu) as game widgets. The plugin owns the
  * values: the loader reads *value when the screen opens, writes it on change, then calls onChange (save there).
  * Callbacks are crash-contained. AddOption returns DK2ML_ERROR (logged) for structSize < this sizeof(DK2ML_Option), an
  * unknown type, a missing value pointer, FLOAT/INT with max <= min, or CHOICE without 1-64 choices. */
@@ -375,7 +375,7 @@ typedef int (*DK2ML_PluginInitFn)(const DK2ML_API* api, const DK2ML_PluginInfo* 
 #define DK2ML_PLUGIN_INIT_NAME "DK2ML_PluginInit"
 
 /* --- manifest ---
- * Optional. Shown on the "Native mods" screen, in dk2ml.log and crash reports; read from the DLL without running it. A
+ * Optional. Shown on the Modloader screen, in dk2ml.log and crash reports; read from the DLL without running it. A
  * loader with DK2ML_API_VERSION < minApiVersion refuses the plugin and says why. UTF-8 texts, cut to array size. Once,
  * at file scope:
  *   DK2ML_PLUGIN_MANIFEST(DK2ML_API_VERSION, "Free Camera", "1.2.0", "Some Author", "https://...", 112);

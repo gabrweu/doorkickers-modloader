@@ -1,4 +1,4 @@
-// The loader's own game hooks, each hooked once, feeding Events.cpp and the Native mods button and screen.
+// The loader's own game hooks, each hooked once, feeding Events.cpp and the Modloader button and screen.
 // ImGui::Render and GUIManager::Load are hooked even without the menu (they drive events); Camera::SetDefaults only
 // if MAP_LOADED is subscribed, because the renderer calls it many times per frame.
 #include "Loader.h"

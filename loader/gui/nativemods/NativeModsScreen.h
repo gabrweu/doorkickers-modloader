@@ -1,4 +1,4 @@
-// The "Native mods" screen at runtime. NativeModsScreenXml.cpp builds the XML.
+// The Modloader screen at runtime. NativeModsScreenXml.cpp builds the XML.
 #pragma once
 
 #include <string>

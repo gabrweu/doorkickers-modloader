@@ -1,7 +1,7 @@
 # AGENTS.md
 
-This project is a dk2ml plugin: a native (DLL) mod for *Door Kickers 2: Task Force North*, loaded by the Door Kickers
-2 Native Mod Loader. C++17, MSVC x64, CMake, PowerShell scripts.
+This project is a dk2ml plugin: a mod with code (a DLL) for *Door Kickers 2: Task Force North*, loaded by the Door
+Kickers 2 Modloader. C++17, MSVC x64, CMake, PowerShell scripts.
 
 **Before writing code, read `docs\for-agents\README.md`.** It routes each task to the right file. The rules in
 `docs\for-agents\rules.md` apply to every change.

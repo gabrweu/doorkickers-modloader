@@ -121,7 +121,7 @@ ImGui's frame.
 - Bind flags by name. `ImGuiWindowFlags_` and the other flag enums are in the PDB (`--enum ImGuiWindowFlags_`), and their values change between ImGui versions (R2).
 - Match ImGui's types exactly (`struct ImVec2 { float x, y; };`), and pass by reference where the real signature does: `ButtonEx(const char*, const ImVec2&, int)` takes a pointer.
 - Clicks on the window also reach the map. Capture input while the window is open ([api-map.md](api-map.md#input)).
-- The Native mods screen exists only on the main menu, so in-mission settings need a window like this. Free Camera has one.
+- The Modloader screen exists only on the main menu, so in-mission settings need a window like this. Free Camera has one.
 
 ## Worker thread → main thread
 ```cpp

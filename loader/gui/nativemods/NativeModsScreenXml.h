@@ -1,4 +1,4 @@
-// The "Native mods" screen as game GUI XML (see NativeModsButton.cpp). No game names or hooks: screentest checks it.
+// The Modloader screen as game GUI XML (see NativeModsButton.cpp). No game names or hooks: screentest checks it.
 #pragma once
 
 #include <string>

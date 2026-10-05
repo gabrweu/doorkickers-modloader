@@ -164,7 +164,7 @@ void ResolveServices();
 // From the save functions' code: no game variable holds it. 0 if not found.
 uint32_t FindGameVersion();
 
-// The Native mods button and screen (needs Symbols_Init). False: no screen; plugins unaffected.
+// The Modloader button and screen (needs Symbols_Init). False: no screen; plugins unaffected.
 bool Resolve();
 
 // Events lacking a name are never sent.

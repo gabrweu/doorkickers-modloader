@@ -90,7 +90,7 @@ bool StartLoaderContained(DWORD* code)
 int WINAPI EntryDetour()
 {
     LogOpen(GameDir() + L"dk2ml.log");
-    LogF("Door Kickers 2 native mod loader %s, api v%d", DK2ML_VERSION, DK2ML_API_VERSION);
+    LogF("Door Kickers 2 Modloader %s, api v%d", DK2ML_VERSION, DK2ML_API_VERSION);
 
     // A loader fault here starts the game unmodded. Plugin init crashes are contained in Plugins.cpp; a plugin's
     // DllMain crash lands here.
@@ -101,11 +101,11 @@ int WINAPI EntryDetour()
         }
         // Includes the entry point hook: safe, since this detour is running and the trampoline stays valid.
         MH_DisableHook(MH_ALL_HOOKS);
-        LogF("the loader crashed while starting (exception 0x%08lX): native mods are off for this session", code);
-        std::wstring text = L"The native mod loader ran into an error while starting, so native mods are off for this "
+        LogF("the loader crashed while starting (exception 0x%08lX): plugins are off for this session", code);
+        std::wstring text = L"The Modloader ran into an error while starting, so plugins are off for this "
                             L"session. The game itself starts normally.\n\n"
                             L"Details are in dk2ml.log in the game folder (the last plugin it names may be the cause).";
-        MessageBoxW(nullptr, text.c_str(), L"Door Kickers 2 - native mods",
+        MessageBoxW(nullptr, text.c_str(), L"Door Kickers 2 - Modloader",
                     MB_OK | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND);
     }
     return g_originalEntry();

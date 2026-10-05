@@ -1294,7 +1294,7 @@ bool Plugins_CrashOwner(uintptr_t address, char* out, size_t size)
 
 void Plugins_CrashMods(CrashText* out)
 {
-    out->Add("\r\nNative mods (%zu):\r\n", g_mods.size());
+    out->Add("\r\nPlugins (%zu):\r\n", g_mods.size());
     for (const ModEntry& e : g_mods) {
         char title[256];
         NarrowInto(e.title.c_str(), title, sizeof(title));

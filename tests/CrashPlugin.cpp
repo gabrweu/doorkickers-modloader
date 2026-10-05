@@ -3,7 +3,7 @@
 // - Ctrl+Shift+F12: a plugin thread writes to address 0. Plugin threads aren't contained, so the game's crash handler
 //   runs; the loader's report is written first.
 // - Ctrl+Shift+F11: the same write in its FRAME callback, which is contained: the plugin is switched off and the game
-//   goes on. A plugin thread then tries CreateSafeHook, which must be refused (dk2ml.log); its Native mods page says
+//   goes on. A plugin thread then tries CreateSafeHook, which must be refused (dk2ml.log); its Modloader page says
 //   it crashed and was switched off for this session.
 // Remove the DLL afterwards.
 #define WIN32_LEAN_AND_MEAN

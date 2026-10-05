@@ -340,7 +340,7 @@ void Crash_Format(const EXCEPTION_RECORD& record, const CONTEXT& context, bool m
     SYSTEMTIME t;
     GetLocalTime(&t);
     DWORD exeStamp = ExeTimeStamp();
-    out->Add("Door Kickers 2 crashed. Report by the native mod loader %s (plugin API v%d).\r\n", DK2ML_VERSION,
+    out->Add("Door Kickers 2 crashed. Report by the Modloader %s (plugin API v%d).\r\n", DK2ML_VERSION,
              DK2ML_API_VERSION);
     out->Add("%04u-%02u-%02u %02u:%02u:%02u, game exe build 0x%08lX, thread %lu (%s)\r\n\r\n", t.wYear, t.wMonth,
              t.wDay, t.wHour, t.wMinute, t.wSecond, exeStamp, GetCurrentThreadId(),

@@ -707,7 +707,7 @@ std::wstring Consent_PromptText(const std::vector<ConsentRequest>& pending)
 bool Consent_Prompt(const std::vector<ConsentRequest>& pending)
 {
     std::wstring text = Consent_PromptText(pending);
-    int answer = MessageBoxW(nullptr, text.c_str(), L"Door Kickers 2 - native mods",
+    int answer = MessageBoxW(nullptr, text.c_str(), L"Door Kickers 2 - Modloader",
                              MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2 | MB_TOPMOST | MB_SETFOREGROUND);
     return answer == IDYES;
 }
@@ -765,13 +765,13 @@ void Consent_EnsureIni(const std::wstring& ini)
         return;
     }
     static const char kDefault[] =
-        "; Door Kickers 2 native mod loader (dk2ml) settings. This file lives next to DoorKickers2.exe.\r\n"
+        "; Door Kickers 2 Modloader (dk2ml) settings. This file lives next to DoorKickers2.exe.\r\n"
         "[loader]\r\n"
-        "; 0 turns the loader off (the game starts unmodded): the way out if a native mod keeps the game from\r\n"
+        "; 0 turns the loader off (the game starts unmodded): the way out if a plugin keeps the game from\r\n"
         "; starting.\r\n"
         "enabled=1\r\n"
         "\r\n"
-        "; Native mods (DLLs) from the Steam Workshop ask for your permission before they load, and again whenever\r\n"
+        "; Plugins (DLLs) from the Steam Workshop ask for your permission before they load, and again whenever\r\n"
         "; their code changes. 1 loads all of them without asking. Not recommended: any Workshop update could ship\r\n"
         "; anything.\r\n"
         "allow_workshop_plugins=0\r\n"

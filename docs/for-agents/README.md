@@ -1,6 +1,6 @@
 # dk2ml plugin docs for agents
 
-Scope: writing, building and checking a dk2ml plugin (a native mod for *Door Kickers 2: Task Force North*). Written
+Scope: writing, building and checking a dk2ml plugin (a mod with code for *Door Kickers 2: Task Force North*). Written
 for coding agents first, people second.
 
 ## Facts

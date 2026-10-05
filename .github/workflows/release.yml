@@ -82,7 +82,7 @@ jobs:
           $readme = $readme.Replace('](../../releases)', "]($repoUrl/releases)")
           $readme = [regex]::Replace($readme, '\]\((?!https?:|#|LICENSE\))([^)]+)\)', "]($repoUrl/blob/HEAD/`$1)")
           $nl = if ($readme.Contains("`r`n")) { "`r`n" } else { "`n" }
-          $readme = "Door Kickers 2 Native Mod Loader v$env:VERSION, built for Door Kickers 2 $env:GAME_VERSION.$nl$nl" + $readme
+          $readme = "Door Kickers 2 Modloader v$env:VERSION, built for Door Kickers 2 $env:GAME_VERSION.$nl$nl" + $readme
           [IO.File]::WriteAllText((Join-Path $stage 'README.md'), $readme, $utf8)
           Copy-Item (Join-Path $root 'LICENSE') $stage
           $notices = "This software includes MinHook (https://github.com/TsudaKageyu/minhook), used under the following license:`r`n`r`n" +

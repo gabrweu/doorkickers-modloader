@@ -1,4 +1,4 @@
-// The "Native mods" screen at runtime: its pages and the player's input.
+// The Modloader screen at runtime: its pages and the player's input.
 //
 // Clicks and changes arrive as event 219 in Screen_OnGameEvent (iParam: widget and action). Widgets are found by name
 // (#dk2ml_w<N>) when the screen opens.
@@ -76,7 +76,7 @@ std::wstring SettingsFolder(const ModEntry& e)
     return L"";
 }
 
-constexpr char kRestartNote[] = "Restart the game to apply your native mod changes.";
+constexpr char kRestartNote[] = "Restart the game to apply your plugin changes.";
 
 std::string StatusText(const ModEntry& e)
 {
@@ -365,7 +365,7 @@ struct OpenTimer {
     {
         ULONGLONG ms = GetTickCount64() - started;
         if (ms > 100) {
-            LogF("Native mods screen: opened in %llu ms", static_cast<unsigned long long>(ms));
+            LogF("Modloader screen: opened in %llu ms", static_cast<unsigned long long>(ms));
         }
     }
 };
@@ -611,13 +611,12 @@ std::wstring JoinNames(const std::vector<std::wstring>& names)
 sx::Page LoaderPage()
 {
     sx::Page loader;
-    loader.title = "Native Mod Loader";
-    loader.lines.push_back(std::string("Door Kickers 2 Native Mod Loader ") + DK2ML_VERSION + ", plugin API v" +
+    loader.title = "Modloader";
+    loader.lines.push_back(std::string("Door Kickers 2 Modloader ") + DK2ML_VERSION + ", plugin API v" +
                            std::to_string(DK2ML_API_VERSION));
     loader.lines.push_back("Runs mods that contain code (DLLs). Workshop mods only run with your permission, asked "
                            "again when they change.");
-    loader.lines.push_back(
-        "If a native mod keeps the game from starting, set enabled=0 in dk2ml.ini in the game folder.");
+    loader.lines.push_back("If a plugin keeps the game from starting, set enabled=0 in dk2ml.ini in the game folder.");
 
     if (Plugins_Mods().empty()) {
         loader.lines.push_back("None of your enabled mods contain native code.");
@@ -792,7 +791,7 @@ void Screen_OnGameEvent(void* params)
     }
 
     if (!CallHandleEvent(param)) {
-        LogF("menu: crashed handling a Native mods screen event (%d)", param);
+        LogF("menu: crashed handling a Modloader screen event (%d)", param);
     }
 }
 

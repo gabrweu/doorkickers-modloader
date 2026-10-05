@@ -346,8 +346,7 @@ std::string MainMenuButton(bool restart)
     auto action = [](const char* type, const char* target) {
         return std::string("<Action type=\"") + type + "\" target=\"" + target + "\"/>";
     };
-    const char* tooltip =
-        restart ? "Restart the game to apply your native mod changes" : "Mods with native code: what loaded, settings";
+    const char* tooltip = restart ? "Restart the game to apply your plugin changes" : "Plugins: what loaded, settings";
 
     std::ostringstream s;
     // clang-format off
@@ -458,7 +457,7 @@ void AddContentArea(std::ostringstream& x)
               << "<RenderObject2D texture=\"" << kTex << "deploy/deploy_class_diagonalbars.dds\""
                  " flipX=\"true\" sizeX=\"140\" sizeY=\"100\" color=\"0c0b0b33\"/>"
           << "</StaticImage>"
-          << Text("", "c", 0, 0, "NATIVE MODS", "header_2", "201f1b")
+          << Text("", "c", 0, 0, "MODLOADER", "header_2", "201f1b")
       << "</StaticImage>";
     // clang-format on
 }
@@ -474,7 +473,7 @@ void AddModList(std::ostringstream& x, const std::vector<Page>& pages, std::vect
           << "<StaticImage align=\"t\" origin=\"0 0\">"
               << Square(kListWidth, kPanelHeight, "211e1dB3")
           << "</StaticImage>"
-          << PanelHeader(kListWidth, "MODS WITH CODE")
+          << PanelHeader(kListWidth, "MOD SETTINGS")
           << "<ItemList name=\"" << kModList << "\" align=\"t\" origin=\"0 -90\""
           << " sizeX=\"" << kListWidth << "\" sizeY=\"" << modListHeight << "\" direction=\"y\" clipChildren=\"true\">"
               << ScrollBar();

@@ -99,7 +99,7 @@ add_library(nomanifest_plugin SHARED tests/ManifestPlugin.cpp)
 target_include_directories(nomanifest_plugin PRIVATE include)
 target_compile_definitions(nomanifest_plugin PRIVATE DK2ML_TEST_NO_MANIFEST)
 
-# the generated "Native mods" screen XML: well-formed, escaped, unique names/events
+# the generated Modloader screen XML: well-formed, escaped, unique names/events
 add_executable(screentest tests/ScreenTest.cpp loader/gui/nativemods/NativeModsScreenXml.cpp)
 target_include_directories(screentest PRIVATE include loader)
 

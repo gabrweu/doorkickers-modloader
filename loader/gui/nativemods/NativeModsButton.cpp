@@ -1,4 +1,4 @@
-// The "Native mods" button (main menu, above "Send Feedback") and screen; called from GameHooks.cpp.
+// The Modloader button (main menu, above "Send Feedback") and screen; called from GameHooks.cpp.
 //
 // The loader has no mod folder, so during GUIManager::Load it merges one more document (button + screen) from memory
 // through MergeItemsFromXML: same parsing and action-target checks as gui files. Items land at the top level; each
@@ -60,7 +60,7 @@ void MergeItemsPost(DK2ML_Regs* r, void*)
     g_mergedThisLoad = true; // also stops re-entry from the merge below
     if (void* doc = MakeDocument(Screen_BuildItems())) {
         int result = fn.MergeItemsFromXML(reinterpret_cast<void*>(r->scratch[0]), doc);
-        LogF("menu: Native mods button and screen %s", result == 0 ? "added" : "could not be added");
+        LogF("menu: Modloader button and screen %s", result == 0 ? "added" : "could not be added");
     }
 }
 
@@ -116,7 +116,7 @@ bool Menu_Init(bool hooksReady)
 {
     g_menuReady = gameui::Resolve();
     if (!g_menuReady) {
-        LogF("menu: not available for this game build (native mods still load)");
+        LogF("menu: not available for this game build (plugins still load)");
     }
 
     bool hooked = false;
@@ -125,7 +125,7 @@ bool Menu_Init(bool hooksReady)
                                    "GUIManager::MergeItemsFromXML");
     }
     if (hooked) {
-        LogF("menu: ready (main menu > Native mods)");
+        LogF("menu: ready (main menu > Modloader)");
     } else {
         g_menuReady = false;
     }
