@@ -339,7 +339,7 @@ std::string MainMenuButton(bool restart)
     };
     auto label = [](const char* color) {
         // clang-format off
-        return std::string("<ButtonText align=\"c\" origin=\"-10 0\" sizeX=\"240\" text=\"NATIVE MODS\""
+        return std::string("<ButtonText align=\"c\" origin=\"-10 0\" sizeX=\"240\" text=\"MODLOADER\""
                            " font=\"header_4\" fontAutoDownsize=\"true\" textColor=\"") + color + "\"/>";
         // clang-format on
     };

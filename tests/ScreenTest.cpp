@@ -322,8 +322,8 @@ void TestMainMenuButton(const Screen& s)
     Expect("main-menu button only shows/hides its icons and the screens", targetsOk);
 
     Expect("main-menu button label is upper case like the game's",
-           button.find("text=\"NATIVE MODS\"") != std::string::npos &&
-               button.find("Native mods\"") == std::string::npos);
+           button.find("text=\"MODLOADER\"") != std::string::npos &&
+               button.find("Modloader\"") == std::string::npos);
     Expect("main-menu button hover icon starts hidden",
            button.find(std::string("name=\"") + sx::kButtonIconHover + "\" origin=\"136 0\" hidden=\"true\"") !=
                std::string::npos);
