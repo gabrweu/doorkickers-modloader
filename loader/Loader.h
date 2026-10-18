@@ -124,7 +124,7 @@ struct PluginManifest {
     std::string name, version, author, url; // UTF-8
 };
 
-using ConsentPromptFn = bool (*)(const std::vector<ConsentRequest>& pending); // true = allow them all
+using ConsentPromptFn = bool (*)(const std::vector<ConsentRequest>& pending); // true = Continue, false = Quit
 
 // final path (links resolved), trailing backslash; empty on failure
 std::wstring Consent_Canonical(const std::wstring& path);
@@ -171,9 +171,9 @@ EnabledDiff Consent_DiffEnabled(const std::vector<std::wstring>& known, const st
 
 bool Consent_Prompt(const std::vector<ConsentRequest>& pending); // the real dialog
 std::wstring Consent_PromptText(const std::vector<ConsentRequest>& pending); // consenttest
-// Checks fingerprints against dk2ml.ini [workshop] (<id>=allow:<fp> or deny:<fp>); one prompt for the unanswered
-// items, answer saved for each. load: per item.
-void Consent_DecideAll(const std::wstring& ini, std::vector<ConsentRequest>& items, ConsentPromptFn prompt,
+// Checks fingerprints against dk2ml.ini [workshop] (<id>=allow:<fp>); one prompt for the new and changed items.
+// Continue saves each and returns true; Quit saves nothing and returns false. load: per item.
+bool Consent_DecideAll(const std::wstring& ini, std::vector<ConsentRequest>& items, ConsentPromptFn prompt,
                        std::vector<bool>* load);
 void Consent_EnsureIni(const std::wstring& ini); // writes the default if missing
 
@@ -188,7 +188,6 @@ std::string Options_SafeFormat(const std::string& format, bool integer);
 // --- Plugins.cpp ---
 enum class ModStatus {
     Loaded,
-    Declined, // Workshop permission refused (this version)
     PathNotAllowed, // not a local mod folder or a DK2 Workshop item
     InitFailed, // DK2ML_PluginInit returned non-zero
     Crashed, // contained crash, switched off

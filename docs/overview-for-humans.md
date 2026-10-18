@@ -26,8 +26,8 @@ Plugins with in-mission settings put a button in the Esc menu with `AddMenuButto
 ### What happens when you start the game
 1. The stub loads the loader. The loader loads the game's PDB.
 2. It reads which mods are enabled (the game's `options.xml`), plus anything in `<game>\mods_native\`.
-3. Your own mod folders load right away. Workshop mods with code get one permission prompt listing all of them, and
-   the answer is remembered per version of the mod's code. Anything else is skipped.
+3. Your own mod folders load right away. Workshop mods with new or updated code get one prompt listing them:
+   Continue loads them and remembers that version of their code, Quit closes the game. Anything else is skipped.
 4. Each plugin's `DK2ML_PluginInit` runs, before the game has done anything. That's where plugins set up hooks,
    events and settings.
 5. The game starts.

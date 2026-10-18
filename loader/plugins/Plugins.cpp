@@ -988,13 +988,8 @@ void ScanGameNativeFolder(Startup* s)
 
 ModStatus StatusBeforeConsent(ModSource source)
 {
-    if (source == ModSource::Local) {
-        return ModStatus::Loaded;
-    }
-    if (source == ModSource::Workshop) {
-        return ModStatus::Declined; // until the player says yes
-    }
-    return ModStatus::PathNotAllowed;
+    // Workshop: DecideWorkshop settles it before anything loads
+    return source == ModSource::Unknown ? ModStatus::PathNotAllowed : ModStatus::Loaded;
 }
 
 void ScanListedMods(const std::vector<std::wstring>& enabled, Startup* s)
@@ -1039,18 +1034,7 @@ void ScanListedMods(const std::vector<std::wstring>& enabled, Startup* s)
     }
 }
 
-ModStatus StatusAfterConsent(bool load, const ConsentRequest& request)
-{
-    if (load) {
-        return ModStatus::Loaded;
-    }
-    if (request.fingerprint.empty()) {
-        return ModStatus::Unreadable;
-    }
-    return ModStatus::Declined;
-}
-
-// Workshop code loads only with the player's permission (Consent.cpp)
+// Workshop code loads only with the player's permission (Consent.cpp); Quit closes the game before any of it runs
 void DecideWorkshop(bool allowWorkshop, const std::wstring& ini, Startup* s)
 {
     if (allowWorkshop) {
@@ -1061,9 +1045,12 @@ void DecideWorkshop(bool allowWorkshop, const std::wstring& ini, Startup* s)
         }
     } else if (!s->workshop.empty()) {
         std::vector<bool> load;
-        Consent_DecideAll(ini, s->workshop, Consent_Prompt, &load);
+        if (!Consent_DecideAll(ini, s->workshop, Consent_Prompt, &load)) {
+            ExitProcess(0); // the entry point detour: no plugin or game code has run yet
+        }
         for (size_t k = 0; k < s->workshop.size(); ++k) {
-            g_mods[s->workshopEntries[k]].status = StatusAfterConsent(load[k], s->workshop[k]);
+            // after Continue, only an unreadable item stays unloaded
+            g_mods[s->workshopEntries[k]].status = load[k] ? ModStatus::Loaded : ModStatus::Unreadable;
         }
     }
 }
@@ -1239,7 +1226,6 @@ const char* StatusName(ModStatus status)
 {
     switch (status) {
     case ModStatus::Loaded: return "running";
-    case ModStatus::Declined: return "not loaded (the player said No)";
     case ModStatus::PathNotAllowed: return "not loaded (folder not allowed)";
     case ModStatus::InitFailed: return "init failed, switched off";
     case ModStatus::Crashed: return "crashed earlier, switched off";

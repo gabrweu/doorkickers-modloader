@@ -30,7 +30,7 @@ enables the mod in the game and allows it in a permission prompt (after restart)
 3. Download mods that require the Modloader from the Steam Workshop.
 4. Open the game, enable the mod you downloaded.
 5. Manually quit the game and restart it through Steam. Restarting via the prompt in the mod page will not load DLLs.
-6. You should see a Windows prompt telling you external code is being loaded. Accept it and play. Profit.
+6. You should see a Windows prompt telling you external code is being loaded. Choose Continue and play. Profit.
 
 **Modloader screen.** The main menu gets a **Modloader** button on the bottom right, above "Send Feedback". There you'll see all the mods registered with the Modloader; they each have their own tab with settings (if they have any settings to change). 
 

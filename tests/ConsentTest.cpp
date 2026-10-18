@@ -39,14 +39,16 @@ void WriteFile(const std::wstring& path, const char* content)
 struct Decision {
     std::vector<bool> load;
     int prompts;
+    bool quit;
 };
 
+// answer: true = Continue, false = Quit
 Decision Decide(const std::wstring& ini, std::vector<ConsentRequest> items, bool answer)
 {
     g_answer = answer;
     int before = g_prompts;
     Decision d;
-    Consent_DecideAll(ini, items, ScriptedPrompt, &d.load);
+    d.quit = !Consent_DecideAll(ini, items, ScriptedPrompt, &d.load);
     d.prompts = g_prompts - before;
     return d;
 }
@@ -243,24 +245,35 @@ void TestRememberedAnswers(const Paths& p, const std::wstring& f1)
 {
     ConsentRequest item{L"123456", L"Test Mod", p.native};
 
+    auto storedAnswer = [&] {
+        wchar_t value[256] = {};
+        GetPrivateProfileStringW(L"workshop", L"123456", L"", value, 256, p.ini.c_str());
+        return std::wstring(value);
+    };
+
     Decision d = Decide(p.ini, {item}, true);
     bool askedAsNew = g_lastPending.size() == 1 && !g_lastPending[0].changed && g_lastPending[0].fingerprint == f1;
-    Expect("first time: asks, and Yes loads", d.prompts == 1 && d.load == std::vector<bool>({true}) && askedAsNew);
+    Expect("first time: asks, and Continue loads",
+           d.prompts == 1 && !d.quit && d.load == std::vector<bool>({true}) && askedAsNew);
 
     d = Decide(p.ini, {item}, false);
-    Expect("allowed version: loads without asking", d.prompts == 0 && d.load[0]);
+    Expect("allowed version: loads without asking", d.prompts == 0 && !d.quit && d.load[0]);
 
     WriteFile(p.native + L"B.dll", "helper v2");
     d = Decide(p.ini, {item}, false);
-    Expect("changed DLL: asks again (marked updated), No skips",
-           d.prompts == 1 && !d.load[0] && g_lastPending[0].changed);
+    Expect("changed DLL: asks again (marked updated), Quit loads nothing",
+           d.prompts == 1 && d.quit && !d.load[0] && g_lastPending[0].changed);
+    Expect("Quit saves nothing", storedAnswer() == L"allow:" + f1);
 
     d = Decide(p.ini, {item}, true);
-    Expect("declined version: skipped without asking", d.prompts == 0 && !d.load[0]);
+    std::wstring f2 = g_lastPending.empty() ? L"" : g_lastPending[0].fingerprint;
+    Expect("after Quit: asks again, and Continue loads", d.prompts == 1 && !d.quit && d.load[0]);
+    Expect("Continue saves the new version", !f2.empty() && f2 != f1 && storedAnswer() == L"allow:" + f2);
 
-    WriteFile(p.native + L"defaults.ini", "x=2");
+    WritePrivateProfileStringW(L"workshop", L"123456", (L"deny:" + f2).c_str(), p.ini.c_str());
     d = Decide(p.ini, {item}, true);
-    Expect("declined, then any file changed: asks again", d.prompts == 1 && d.load[0] && g_lastPending[0].changed);
+    Expect("an older loader's deny: line: asked again as updated",
+           d.prompts == 1 && d.load[0] && g_lastPending[0].changed);
 }
 
 // several items at once: one prompt for the new and changed ones; answered and unreadable ones are left out
@@ -278,7 +291,8 @@ void TestSeveralItems(const Paths& p)
     bool listsBoth = g_lastPending.size() == 2 && g_lastPending[0].itemId == L"123456" && g_lastPending[0].changed &&
                      g_lastPending[1].itemId == L"777" && !g_lastPending[1].changed;
     Expect("one prompt lists every new or changed item", d.prompts == 1 && listsBoth);
-    Expect("Yes loads them all; an unreadable item never loads", d.load == std::vector<bool>({true, true, false}));
+    Expect("Continue loads them all; an unreadable item never loads",
+           !d.quit && d.load == std::vector<bool>({true, true, false}));
 
     wchar_t stored[256] = {};
     GetPrivateProfileStringW(L"workshop", L"888", L"", stored, 256, p.ini.c_str());
@@ -292,14 +306,17 @@ void TestSeveralItems(const Paths& p)
                      text.find(L"\"Other\"  (new)  workshop item 777") != std::wstring::npos;
     Expect("prompt text: each item's title, new or updated, and id", namesBoth);
     Expect("prompt text: the warning", text.find(L"full access to your PC") != std::wstring::npos);
+    Expect("prompt text: the two choices",
+           text.find(L"Continue: ") != std::wstring::npos && text.find(L"Quit: close the game") != std::wstring::npos);
 
     WriteFile(p.native + L"defaults.ini", "x=4");
     WriteFile(otherNative + L"o.dll", "other plugin v2");
     d = Decide(p.ini, {item, other}, false);
-    Expect("No skips them all", d.prompts == 1 && d.load == std::vector<bool>({false, false}));
+    Expect("Quit loads none of them", d.prompts == 1 && d.quit && d.load == std::vector<bool>({false, false}));
 
     d = Decide(p.ini, {item, other}, true);
-    Expect("No is remembered for each until it changes", d.prompts == 0 && d.load == std::vector<bool>({false, false}));
+    Expect("Quit is not remembered: both asked again",
+           d.prompts == 1 && g_lastPending.size() == 2 && !d.quit && d.load == std::vector<bool>({true, true}));
 
     std::vector<ConsentRequest> many;
     for (int i = 0; i < 20; ++i) {

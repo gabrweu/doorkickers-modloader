@@ -142,7 +142,7 @@ std::vector<sx::Page> MakePages()
     pages[2].hasStatus = true;
     pages[2].buttons = {sx::PageButton::ModFolder};
     pages[2].dimmed = true;
-    pages[2].tooltip = "Not loaded: you said No";
+    pages[2].tooltip = "Not loaded: needs a newer mod loader";
     return pages;
 }
 
@@ -250,7 +250,7 @@ void TestModList(const Screen& s)
     Expect("the selected entry can't be clicked off", std::regex_search(s.doc, checkedOrange));
 
     bool mutedWithReason = s.doc.find("textColor=\"a08f80\"") != std::string::npos &&
-                           s.doc.find("tooltip=\"Not loaded: you said No\"") != std::string::npos;
+                           s.doc.find("tooltip=\"Not loaded: needs a newer mod loader\"") != std::string::npos;
     Expect("a not-loaded mod is muted in the list and says why", mutedWithReason);
 }
 

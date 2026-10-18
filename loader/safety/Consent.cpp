@@ -3,7 +3,8 @@
 // - Classification, after canonicalizing: local folders load without asking, Workshop items need permission, the
 //   rest is skipped.
 // - Consent is per version: stored per item with a fingerprint of its native\ folder (dk2ml.ini [workshop]
-//   <itemId>=allow:<sha256> or deny:<sha256>). A new fingerprint asks again, in one startup prompt.
+//   <itemId>=allow:<sha256>). A new fingerprint asks again, in one startup prompt: Continue loads them all, Quit
+//   closes the game and saves nothing.
 //
 // A heads-up for players, not a security boundary: native code has full access to the PC.
 #include "Loader.h"
@@ -684,7 +685,8 @@ std::wstring Consent_ModTitle(const std::wstring& modDir)
 std::wstring Consent_PromptText(const std::vector<ConsentRequest>& pending)
 {
     constexpr size_t kMaxListed = 15; // a message box taller than the screen hides its buttons
-    std::wstring text = L"These Steam Workshop mods want to run native code (DLLs) in Door Kickers 2:\n\n";
+    std::wstring text = L"These Steam Workshop mods have new or updated native code (DLLs) that wants to run in Door "
+                        L"Kickers 2:\n\n";
     for (size_t i = 0; i < pending.size() && i < kMaxListed; ++i) {
         const ConsentRequest& r = pending[i];
         text += L"    \"" + r.title + L"\"  (" + (r.changed ? L"updated" : L"new") + L")  workshop item " + r.itemId +
@@ -696,23 +698,48 @@ std::wstring Consent_PromptText(const std::vector<ConsentRequest>& pending)
     text +=
         L"\nNative code runs with full access to your PC, like any program you install. Only load mods from authors "
         L"you trust.\n\n"
-        L"Load them?\n"
-        L"    Yes: load these versions.\n"
-        L"    No: skip their code (the rest of each mod still loads).\n\n"
-        L"You'll be asked again when one of them updates. Your answers are in dk2ml.ini in the game folder (delete a "
-        L"line to be asked again).";
+        L"    Continue: load them and start the game.\n"
+        L"    Quit: close the game. To play without them, unsubscribe on Steam, or set enabled=0 in dk2ml.ini (in the "
+        L"game folder) to start without the Modloader and disable them in the Mods menu.\n\n"
+        L"You'll be asked again whenever one of them updates.";
     return text;
 }
+
+namespace {
+
+HHOOK g_buttonHook = nullptr;
+
+// Renames the message box's OK/Cancel as it opens; this thread only.
+LRESULT CALLBACK RenameButtons(int code, WPARAM wParam, LPARAM lParam)
+{
+    if (code == HCBT_ACTIVATE) {
+        HWND box = reinterpret_cast<HWND>(wParam);
+        SetDlgItemTextW(box, IDOK, L"Continue");
+        SetDlgItemTextW(box, IDCANCEL, L"Quit");
+        UnhookWindowsHookEx(g_buttonHook);
+        g_buttonHook = nullptr;
+        return 0;
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+} // namespace
 
 bool Consent_Prompt(const std::vector<ConsentRequest>& pending)
 {
     std::wstring text = Consent_PromptText(pending);
+    // without the hook the buttons read OK/Cancel; the text still says which is which
+    g_buttonHook = SetWindowsHookExW(WH_CBT, RenameButtons, nullptr, GetCurrentThreadId());
     int answer = MessageBoxW(nullptr, text.c_str(), L"Door Kickers 2 - Modloader",
-                             MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2 | MB_TOPMOST | MB_SETFOREGROUND);
-    return answer == IDYES;
+                             MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2 | MB_TOPMOST | MB_SETFOREGROUND);
+    if (g_buttonHook) {
+        UnhookWindowsHookEx(g_buttonHook);
+        g_buttonHook = nullptr;
+    }
+    return answer == IDOK; // Esc and the close button are Cancel: Quit
 }
 
-void Consent_DecideAll(const std::wstring& ini, std::vector<ConsentRequest>& items, ConsentPromptFn prompt,
+bool Consent_DecideAll(const std::wstring& ini, std::vector<ConsentRequest>& items, ConsentPromptFn prompt,
                        std::vector<bool>* load)
 {
     load->assign(items.size(), false);
@@ -728,35 +755,38 @@ void Consent_DecideAll(const std::wstring& ini, std::vector<ConsentRequest>& ite
         if (stored == L"allow:" + r.fingerprint) {
             LogF("workshop item %ls (%ls): allowed earlier", r.itemId.c_str(), r.title.c_str());
             (*load)[i] = true;
-        } else if (stored == L"deny:" + r.fingerprint) {
-            LogF("workshop item %ls (%ls): declined earlier, its code is not loaded", r.itemId.c_str(),
-                 r.title.c_str());
         } else {
-            r.changed = !stored.empty();
+            r.changed = !stored.empty(); // another version, or a deny: line from an older loader
             pendingAt.push_back(i);
         }
     }
 
     if (pendingAt.empty()) {
-        return;
+        return true;
     }
 
     std::vector<ConsentRequest> pending;
     for (size_t i : pendingAt) {
         pending.push_back(items[i]);
     }
-    bool allow = prompt(pending);
+    if (!prompt(pending)) {
+        LogF("player chose Quit at the Workshop prompt (%zu new or updated item(s)): closing the game, nothing saved",
+             pending.size());
+        load->assign(items.size(), false);
+        return false;
+    }
 
     for (size_t i : pendingAt) {
         const ConsentRequest& r = items[i];
-        (*load)[i] = allow;
-        std::wstring value = (allow ? L"allow:" : L"deny:") + r.fingerprint;
+        (*load)[i] = true;
+        std::wstring value = L"allow:" + r.fingerprint;
         if (!WritePrivateProfileStringW(kSection, r.itemId.c_str(), value.c_str(), ini.c_str())) {
             LogF("cannot save the answer to %ls (error %lu); you'll be asked again", ini.c_str(), GetLastError());
         }
-        LogF("workshop item %ls (%ls)%s: player %s it", r.itemId.c_str(), r.title.c_str(),
-             r.changed ? " changed since the last answer" : "", allow ? "allowed" : "declined");
+        LogF("workshop item %ls (%ls)%s: player allowed it", r.itemId.c_str(), r.title.c_str(),
+             r.changed ? " changed since the last answer" : "");
     }
+    return true;
 }
 
 void Consent_EnsureIni(const std::wstring& ini)
@@ -776,7 +806,7 @@ void Consent_EnsureIni(const std::wstring& ini)
         "; anything.\r\n"
         "allow_workshop_plugins=0\r\n"
         "\r\n"
-        "; Your answers, per Workshop item id: allow:<fingerprint> or deny:<fingerprint> of its native folder.\r\n"
+        "; Per Workshop item id: allow:<fingerprint> of the native folder version you chose Continue for.\r\n"
         "; Delete a line to be asked again.\r\n"
         "[workshop]\r\n";
     std::ofstream file(ini, std::ios::binary);

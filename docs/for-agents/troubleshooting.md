@@ -46,7 +46,7 @@ Symptom → cause → fix. Exact output strings are in code spans. `<...>` marks
 | `not loading <path>: a plugin named <file> is already loaded from <dir>` | another mod has the same DLL name | Rename the project (R17) |
 | `not loading <path>: it needs plugin API <n>, ...` | the manifest's `minApiVersion` is above the installed loader's | Lower it to the loader's API version, or the human updates the loader |
 | `skipping the native code in <dir>: neither one of your mod folders nor a Door Kickers 2 Workshop item` | installed somewhere the loader doesn't trust | Install with `.\tools\install.ps1` (to `mods_upload`) |
-| `workshop item <id> (<title>): declined earlier, its code is not loaded` | the player answered No | Delete that item's line under `[workshop]` in `<game>\dk2ml.ini` to be asked again |
+| `player chose Quit at the Workshop prompt (...): closing the game, nothing saved` | the player chose Quit; the game closed before any plugin loaded | Start again and choose Continue, or unsubscribe, or set `enabled=0` in `<game>\dk2ml.ini` and disable the mod in the Mods menu |
 | `<path> init returned <N>; its hooks are switched off` | init returned non-zero | Run the dry run, which shows why |
 | `<path> crashed during init (exception 0x<code>)` | crash in init, often a null binding or GUI or game access in init | Dry run. Don't touch game objects in init (R12) |
 | `<path> looked up <N> name(s) this game build doesn't have...` | missing names in game | [After a game update](#after-a-game-update) |

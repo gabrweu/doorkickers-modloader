@@ -94,8 +94,6 @@ std::string StatusText(const ModEntry& e)
                                                : "Enabled after the game started: restart the game to load it";
     case ModStatus::Duplicate: return "Not loaded: the same plugin is already loaded from " + U8(e.duplicateOf);
     case ModStatus::Loaded: return "Loaded";
-    case ModStatus::Declined:
-        return "Not loaded: you said No (asked again when it updates, or delete its line in dk2ml.ini)";
     case ModStatus::PathNotAllowed: return "Not loaded: not in your mods folder or the Workshop";
     case ModStatus::InitFailed: return "Failed to start (see dk2ml.log)";
     case ModStatus::Crashed: return "Crashed and was switched off for this session";
