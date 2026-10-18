@@ -162,6 +162,7 @@ int g_callbackEvent = -1;
 DK2ML_GuiCallbackFn g_callback = nullptr;
 bool g_captured = false;
 uint32_t g_guiEvent = 0;
+const DK2ML_MenuButton* g_menuButton = nullptr;
 
 void* FakeGuiFind(void* under, const char* name)
 {
@@ -193,6 +194,12 @@ DK2ML_Status FakeSubscribeGui(uint32_t id, DK2ML_EventFn, void*)
     return DK2ML_OK;
 }
 
+DK2ML_Status FakeAddMenuButton(const DK2ML_MenuButton* button)
+{
+    g_menuButton = button;
+    return DK2ML_OK;
+}
+
 DK2ML_API MakeApi()
 {
     DK2ML_API api = {};
@@ -214,6 +221,7 @@ DK2ML_API MakeApi()
     api.GuiSetCallback = FakeGuiSetCallback;
     api.CaptureGameInput = FakeCapture;
     api.SubscribeGuiEvent = FakeSubscribeGui;
+    api.AddMenuButton = FakeAddMenuButton;
     return api;
 }
 
@@ -308,6 +316,20 @@ void CheckGuiWrappers(const DK2ML_API* api)
     Expect("CaptureInput / OnGuiEvent", captureAndEvent);
     Expect("OnGuiEvent refuses an id that isn't one (e.g. an unresolved Enum)",
            !dk2ml::OnGuiEvent(api, 0, [](const DK2ML_Event*, void*) {}) && g_guiEvent == 148);
+
+    DK2ML_MenuButton b = {sizeof(b)};
+    b.label = "CAM";
+    b.onClick = [](void*, float, float, void*) {};
+    Expect("gui::AddMenuButton hands the button over", dk2ml::gui::AddMenuButton(api, b) && g_menuButton == &b);
+
+    DK2ML_API old = *api; // an API 1 loader: no AddMenuButton field
+    old.apiVersion = 1;
+    old.structSize = static_cast<uint32_t>(offsetof(DK2ML_API, AddMenuButton));
+    old.AddMenuButton = nullptr;
+    g_menuButton = nullptr;
+    g_log.clear();
+    Expect("gui::AddMenuButton on an API 1 loader: false and logged, never called",
+           !dk2ml::gui::AddMenuButton(&old, b) && !g_menuButton && g_log.find("API 1") != std::string::npos);
 }
 
 void CheckTypedArguments()

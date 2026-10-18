@@ -9,6 +9,7 @@
 // symtest.exe <game dir> --check-index [samples]: the loader's name index vs dbghelp's per-call answers
 #include "../loader/Loader.h"
 #include "../loader/gui/GameUi.h"
+#include "../loader/gui/menubuttons/MenuButtonsXml.h"
 
 #include <cstdarg>
 #include <cstddef>
@@ -218,6 +219,20 @@ DK2ML_Status StubGuiSetCallback(void*, int, DK2ML_GuiCallbackFn, void*)
     return DK2ML_ERROR;
 }
 
+int g_menuButtons = 0;
+
+DK2ML_Status StubAddMenuButton(const DK2ML_MenuButton* button)
+{
+    DK2ML_MenuButton copy;
+    if (const char* error = menuxml::Check(button, &copy)) {
+        Problem("AddMenuButton \"%s\": %s", copy.tooltip ? copy.tooltip : "", error);
+        return DK2ML_ERROR;
+    }
+
+    ++g_menuButtons;
+    return DK2ML_OK;
+}
+
 void TestLog(const char* fmt, ...)
 {
     va_list args;
@@ -241,7 +256,7 @@ const wchar_t* TestConfigDir()
 }
 
 // Field by field, independent of order. The assert catches a new DK2ML_API field missing here.
-static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, IsGameMenuOpen) + sizeof(void*),
+static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, AddMenuButton) + sizeof(void*),
               "DK2ML_API grew: fill the new fields");
 
 DK2ML_API MakeTestApi()
@@ -284,6 +299,7 @@ DK2ML_API MakeTestApi()
     api.SubscribeGuiEvent = StubSubscribeGuiEvent;
     api.GetGameVersion = []() { return gameui::FindGameVersion(); };
     api.GetGameWindow = []() -> void* { return nullptr; }; // no window in a dry run
+    api.AddMenuButton = StubAddMenuButton;
     return api;
 }
 
@@ -628,6 +644,9 @@ int DryRun(const std::wstring& gameDir, const std::wstring& plugin)
     }
     if (g_tasks) {
         printf("  [dry run] %d task(s) queued (they run from the first frame in the game)\n", g_tasks);
+    }
+    if (g_menuButtons) {
+        printf("  [dry run] %d Esc-menu button(s)\n", g_menuButtons);
     }
     if (g_guiCalls) {
         printf("  [dry run] %d GUI kit call(s) during init: there is no GUI yet (use GUI_LOADED)\n", g_guiCalls);

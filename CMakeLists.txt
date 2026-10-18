@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(dk2ml VERSION 1.0.1 LANGUAGES C CXX ASM_MASM RC)
+project(dk2ml VERSION 1.1.0 LANGUAGES C CXX ASM_MASM RC)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -58,6 +58,9 @@ add_library(dk2ml SHARED
     loader/gui/GuiThunks.cpp
     loader/gui/nativemods/NativeModsScreen.cpp
     loader/gui/nativemods/NativeModsScreenXml.cpp
+    # plugins' Esc-menu buttons (AddMenuButton)
+    loader/gui/menubuttons/MenuButtons.cpp
+    loader/gui/menubuttons/MenuButtonsXml.cpp
     # Workshop consent, crash reports
     loader/safety/Consent.cpp
     loader/safety/CrashReport.cpp
@@ -69,7 +72,8 @@ target_compile_definitions(dk2ml PRIVATE UNICODE _UNICODE)
 # PDB explorer and plugin dry run (shipped in the template zip's tools\)
 add_executable(symtest tools/SymTest.cpp loader/core/Symbols.cpp loader/core/Log.cpp loader/proxy/RealDbgHelp.cpp
     loader/gui/GameUi.cpp loader/plugins/OptionCheck.cpp loader/plugins/Events.cpp loader/plugins/Interfaces.cpp
-    loader/safety/Consent.cpp)
+    loader/safety/Consent.cpp loader/gui/menubuttons/MenuButtonsXml.cpp
+    loader/gui/nativemods/NativeModsScreenXml.cpp)
 target_include_directories(symtest PRIVATE include loader)
 target_link_libraries(symtest PRIVATE psapi bcrypt shell32 user32)
 target_compile_definitions(symtest PRIVATE UNICODE _UNICODE)
@@ -99,8 +103,9 @@ add_library(nomanifest_plugin SHARED tests/ManifestPlugin.cpp)
 target_include_directories(nomanifest_plugin PRIVATE include)
 target_compile_definitions(nomanifest_plugin PRIVATE DK2ML_TEST_NO_MANIFEST)
 
-# the generated Modloader screen XML: well-formed, escaped, unique names/events
-add_executable(screentest tests/ScreenTest.cpp loader/gui/nativemods/NativeModsScreenXml.cpp)
+# the generated Modloader screen and Esc-menu button XML: well-formed, escaped, unique names/events
+add_executable(screentest tests/ScreenTest.cpp loader/gui/nativemods/NativeModsScreenXml.cpp
+    loader/gui/menubuttons/MenuButtonsXml.cpp)
 target_include_directories(screentest PRIVATE include loader)
 
 # template/, built so it keeps compiling against the current headers

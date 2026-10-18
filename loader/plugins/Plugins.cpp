@@ -258,6 +258,7 @@ void SwitchOff(HMODULE owner)
 
     DisableHooksOf(owner);
     FaultOptionsOf(owner);
+    MenuButtons_FaultOwner(owner);
 }
 
 DK2ML_Status Refused(HMODULE owner, const char* what, void* target)
@@ -574,6 +575,17 @@ __declspec(noinline) DK2ML_Status Api_SubscribeGuiEvent(uint32_t guiEventId, DK2
     return Events_SubscribeGui(ModuleAt(_ReturnAddress()), guiEventId, fn, user);
 }
 
+__declspec(noinline) DK2ML_Status Api_AddMenuButton(const DK2ML_MenuButton* button)
+{
+    HMODULE owner = ModuleAt(_ReturnAddress());
+    if (!g_optionsOpen) {
+        LogF("%ls: AddMenuButton after DK2ML_PluginInit returned, ignored (add buttons in init)",
+             ModuleFileName(owner).c_str());
+        return DK2ML_ERROR;
+    }
+    return MenuButtons_Add(owner, button);
+}
+
 uint32_t Api_GetGameVersion()
 {
     return GuiKit_GameVersion();
@@ -585,7 +597,7 @@ void* Api_GetGameWindow()
 }
 
 // positional: a new DK2ML_API field without an entry here would be NULL
-static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, IsGameMenuOpen) + sizeof(void*),
+static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, AddMenuButton) + sizeof(void*),
               "DK2ML_API grew: add the new fields");
 const DK2ML_API g_api = {
     DK2ML_API_VERSION,
@@ -623,6 +635,7 @@ const DK2ML_API g_api = {
     Api_GuiSetCallback,
     Api_CaptureGameInput,
     Api_IsGameMenuOpen,
+    Api_AddMenuButton,
 };
 
 // --- loading ---

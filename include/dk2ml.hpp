@@ -38,6 +38,7 @@
  */
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
@@ -371,6 +372,22 @@ inline bool Click(const DK2ML_API* api, void* item)
 inline bool OnAction(const DK2ML_API* api, void* item, int64_t itemEvent, DK2ML_GuiCallbackFn fn, void* user = nullptr)
 {
     return api->GuiSetCallback(item, static_cast<int>(itemEvent), fn, user) == DK2ML_OK;
+}
+
+// A button in the Esc menus (see "Esc-menu buttons" in dk2ml.h); init only. False (logged) on an API 1 loader:
+//   DK2ML_MenuButton b = {sizeof(b)};
+//   b.icon = "data/textures/gui/my_mod_normal.dds";
+//   b.iconHover = "data/textures/gui/my_mod_hover.dds";
+//   b.tooltip = "My Mod settings";
+//   b.onClick = [](void*, float, float, void*) { g_windowOpen = !g_windowOpen; };
+//   dk2ml::gui::AddMenuButton(api, b);
+inline bool AddMenuButton(const DK2ML_API* api, const DK2ML_MenuButton& button)
+{
+    if (api->structSize <= offsetof(DK2ML_API, AddMenuButton)) {
+        api->Log("this loader has no Esc-menu buttons (plugin API %u, they need 2)", api->apiVersion);
+        return false;
+    }
+    return api->AddMenuButton(&button) == DK2ML_OK;
 }
 
 } // namespace gui

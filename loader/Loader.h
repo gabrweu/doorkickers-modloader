@@ -368,3 +368,11 @@ void Menu_OnFrame();
 void Menu_OnGuiLoadBegin();
 void Menu_OnGuiLoadEnd();
 void Menu_OnGuiLoaded();
+
+// --- gui/menubuttons/MenuButtons.cpp ---
+// AddMenuButton: plugins' buttons in the Esc menus, merged and attached alongside the Modloader button
+DK2ML_Status MenuButtons_Add(HMODULE owner, const DK2ML_MenuButton* button); // init only (Plugins.cpp checks)
+void MenuButtons_FaultOwner(HMODULE owner); // its buttons hide; any thread
+std::string MenuButtons_BuildItems(); // XML for each GUI load's merged document
+void MenuButtons_OnFrame();
+void MenuButtons_OnGuiLoadBegin();

@@ -16,7 +16,7 @@ Hard rules for dk2ml plugin code. Cite them by number. Each has its reason, so e
 - **R10. Skip the original (`DK2ML_SKIP_ORIGINAL`) only when the task requires it.** Plugins later in the chain don't run for that call.
 
 ## Init and lifetime
-- **R11. MUST call `AddOption`, `Subscribe`, `SubscribeGuiEvent` and `PublishInterface` only inside `DK2ML_PluginInit`.** Later calls return `DK2ML_ERROR`. Create hooks there too.
+- **R11. MUST call `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface` and `AddMenuButton` only inside `DK2ML_PluginInit`.** Later calls return `DK2ML_ERROR`. Create hooks there too.
 - **R12. NEVER use the GUI kit or game objects during init.** No GUI and no game objects exist yet (`*g_pGameClient` is null). Find GUI items from `DK2ML_EVENT_GUI_LOADED` on, and find them again after every `GUI_LOADED`.
 - **R13. MUST return non-zero from init when a required step fails** (`ResolveAll`, a hook, a subscription). The loader then switches the plugin off cleanly.
 - **R14. MUST NOT leave game state that only the plugin can undo.** The plugin can be switched off at any time, after a crash or when the player disables the mod mid-session. Prefer changes the game resets by itself, for example on the next map load.
@@ -36,3 +36,12 @@ Hard rules for dk2ml plugin code. Cite them by number. Each has its reason, so e
 - **R24. NEVER publish or upload** (Steam Workshop, releases). Tell the human what to publish.
 - **R25. NEVER commit game-derived material** to the plugin's repository: PDB dumps (`publics.txt`, type dumps), disassembly output, game assets. Keep them local and git-ignored.
 - **R26. MUST NOT change `dk2ml\dk2ml.h` or `dk2ml.hpp`.** They describe the loader's ABI. Update them only by copying newer versions from a loader release.
+
+## Input
+- **R27. Hotkeys MUST respect modifiers.** `GetAsyncKeyState` reports a key no matter what else is held, and players run several mods at once.
+  - A plain-key hotkey ignores presses made while Ctrl or Alt is held. Those keys belong to another plugin's or the game's combination: Extra Controls' Ctrl+Z / Ctrl+Y undo and redo, the game's Ctrl+C / Ctrl+V loadout copy and paste. A camera mod that turned on plain Z also turned on every Ctrl+Z.
+  - A key held through such a combination stays ignored until it's released. Letting go of Ctrl first must not fire it. Updating `wasDown` from the raw key state while skipping the action does this for a press edge.
+  - A combination hotkey checks that exactly its modifiers are held, so Ctrl+Z doesn't also fire on Ctrl+Shift+Z.
+  - Shift is the plugin's call. The game itself uses Shift + key for team-wide variants.
+  - A hotkey bound to Ctrl or Alt itself is read as is.
+  - Pattern: [api-map.md](api-map.md#input).

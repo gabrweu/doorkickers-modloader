@@ -78,9 +78,25 @@ Files in `native\` are part of what Workshop players approve, and changing them 
 ship defaults, put a defaults file in `native\`. On first start, copy it to `api->GetConfigDir()`, and from then on
 read and write only the copy (R16). The load, save and `AddOption` pattern is in the template's `src\Plugin.cpp`.
 
-## Put a button into a game menu
+## Put a button into the Esc menu
+`AddMenuButton` (API 2) in init. The loader makes the button in both Esc menus (single missions and campaigns), shares
+rows of 3 above the menu's own buttons among all plugins, and calls `onClick` on the main thread. No GUI XML, no frame handler:
+```cpp
+// in DK2ML_PluginInit (R11); icons are 64x64 textures in mod\textures\gui\ (or set label = "CAM" instead)
+DK2ML_MenuButton b = {sizeof(b)};
+b.icon = "data/textures/gui/mymod_normal.dds";
+b.iconHover = "data/textures/gui/mymod_hover.dds";
+b.tooltip = "My Mod settings";
+b.onClick = [](void*, float, float, void*) { g_windowOpen = !g_windowOpen; };
+dk2ml::gui::AddMenuButton(api, b);
+```
+Declare `DK2ML_PLUGIN_MANIFEST(2, ...)`, or check the result: on an API 1 loader `gui::AddMenuButton` returns false.
+Esc stays open after the click, so an ImGui window opened from it should capture input
+([api-map.md](api-map.md#input)).
+
+## Put a button into another game menu
 The XML item goes in `mod\gui\<file>.xml` with a prefixed name (R18). An item has one parent, so move it every frame
-it isn't in the target yet. Free Camera's Esc-menu button (`menu.cpp`) does this:
+it isn't in the target yet:
 ```cpp
 // in a DK2ML_EVENT_FRAME handler
 void* button = dk2ml::gui::Find(api, "#mymod_button");
@@ -121,7 +137,8 @@ ImGui's frame.
 - Bind flags by name. `ImGuiWindowFlags_` and the other flag enums are in the PDB (`--enum ImGuiWindowFlags_`), and their values change between ImGui versions (R2).
 - Match ImGui's types exactly (`struct ImVec2 { float x, y; };`), and pass by reference where the real signature does: `ButtonEx(const char*, const ImVec2&, int)` takes a pointer.
 - Clicks on the window also reach the map. Capture input while the window is open ([api-map.md](api-map.md#input)).
-- The Modloader screen exists only on the main menu, so in-mission settings need a window like this. Free Camera has one.
+- The Modloader screen exists only on the main menu, so in-mission settings need a window like this, opened from an
+  [Esc-menu button](#put-a-button-into-the-esc-menu). Free Camera has one.
 
 ## Worker thread → main thread
 ```cpp

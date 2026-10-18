@@ -2,7 +2,8 @@
 //
 // The loader has no mod folder, so during GUIManager::Load it merges one more document (button + screen) from memory
 // through MergeItemsFromXML: same parsing and action-target checks as gui files. Items land at the top level; each
-// frame AddChild moves the button into Menu_Main > "Extra Buttons", so it shows and hides with the menu.
+// frame AddChild moves the button into Menu_Main > "Extra Buttons", so it shows and hides with the menu. Plugins'
+// Esc-menu buttons (MenuButtons.cpp) ride in the same document.
 #include "Loader.h"
 
 #include <cstring>
@@ -58,9 +59,10 @@ void MergeItemsPost(DK2ML_Regs* r, void*)
         return;
     }
     g_mergedThisLoad = true; // also stops re-entry from the merge below
-    if (void* doc = MakeDocument(Screen_BuildItems())) {
+    if (void* doc = MakeDocument(Screen_BuildItems() + MenuButtons_BuildItems())) {
         int result = fn.MergeItemsFromXML(reinterpret_cast<void*>(r->scratch[0]), doc);
-        LogF("menu: Modloader button and screen %s", result == 0 ? "added" : "could not be added");
+        LogF("menu: Modloader button, screen and plugins' Esc-menu buttons %s",
+             result == 0 ? "added" : "could not be added");
     }
 }
 
@@ -143,6 +145,7 @@ void Menu_OnFrame()
         return;
     }
     AttachButton();
+    MenuButtons_OnFrame();
     Screen_Tick();
 }
 
@@ -151,6 +154,7 @@ void Menu_OnGuiLoadBegin()
     g_inGuiLoad = true;
     g_mergedThisLoad = false;
     g_attachGaveUp = false; // a GUI reload rebuilds everything
+    MenuButtons_OnGuiLoadBegin();
 }
 
 void Menu_OnGuiLoadEnd()

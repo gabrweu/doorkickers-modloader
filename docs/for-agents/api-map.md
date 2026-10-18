@@ -9,6 +9,7 @@ functions, events, tasks and GUI callbacks.
 |---|---|---|
 | Code every frame, on state change, map load, GUI reload, window resize | event | [Events](#events) |
 | React to a game GUI event (screen opened, `TriggerEvent`) | GUI event | [GUI](#gui) |
+| A button in the Esc menu (e.g. to open in-mission settings) | `AddMenuButton` | [GUI](#gui) |
 | Buttons, text, menus | GUI XML in `mod\gui\` + GUI kit | [GUI](#gui) |
 | Player settings | `AddOption` | [Options](#options) |
 | Read or write game state | bindings + `Field` | [symbols.md](symbols.md#binding-dk2mlhpp) |
@@ -90,7 +91,7 @@ it when the player changes it, then calls `onChange`, where the plugin saves.
 - Set `structSize = sizeof(DK2ML_Option)`. `value` must point to static storage. Strings are copied, up to 512 bytes.
 - Failure: `DK2ML_ERROR`, with the reason logged. The dry run prints `[dry run] PROBLEM: AddOption "<label>": <reason>`.
 - Save to `api->GetConfigDir()` (R16). Pattern: `LoadSettings` before `AddOption`, `SaveSettings` as `onChange`. See `src\Plugin.cpp`.
-- The screen exists on the main menu only. In-mission settings need an ImGui window ([cookbook.md](cookbook.md#imgui-window)).
+- The screen exists on the main menu only. In-mission settings need an ImGui window ([cookbook.md](cookbook.md#imgui-window)), opened from an Esc-menu button (`AddMenuButton`).
 
 ## GUI
 Mod GUI: every `.xml` in the mod's `gui\` folder (template: `mod\gui\`) is loaded. Its top-level items join the GUI.
@@ -112,11 +113,13 @@ game build, everything returns NULL, 0, `""` or `DK2ML_ERROR`.
 | Run OnClick actions | `GuiClick(item)` | `Click` | `DK2ML_ERROR` |
 | Bind `<Action type="Callback">` to a function | `GuiSetCallback(item, itemEvent, fn, user)` | `OnAction(api, item, itemEvent, fn, user)` | `DK2ML_ERROR` if the item has no Callback action for that event |
 | Game GUI event (`GUI::Events::eEventType`) | `SubscribeGuiEvent(id, fn, user)` (init) | `dk2ml::OnGuiEvent(api, id, fn, user)` | `DK2ML_ERROR`, false for id ≤ 0 |
+| Button in the Esc menus (API 2) | `AddMenuButton(&button)` (init) | `AddMenuButton(api, button)` | `DK2ML_ERROR`, logged; false on an API 1 loader |
 
 - Item callbacks need XML: `<OnClick><Action type="Callback" target="<an existing item>"/></OnClick>`. Then, after `GUI_LOADED`: `dk2ml::Enum EVENT_CLICK{"GUI::Item::eItemEventType", "EVENT_CLICK"}` and `gui::OnAction(api, item, EVENT_CLICK.Get(), fn)`.
 - A clone copies callbacks. Bind on the template before cloning.
 - GUI events arrive after the game handled them and can't block it. To block one, safe-hook the game's handler.
-- Putting an item into a game menu: an item has one parent. Each frame, if `Parent(item) != target`, call `AddChild`, then `Show`. Code: [cookbook.md](cookbook.md#put-a-button-into-a-game-menu).
+- Esc-menu buttons: `DK2ML_MenuButton` with `structSize`, `onClick`, and an `icon` (64×64 texture path, optional `iconHover`) or a short `label`; optional `tooltip`. Strings are copied. The loader makes the items in both Esc menus (`Menu_Ingame`, `Menu_Ingame_Campaign`) and puts every plugin's buttons in rows of 3 above the menu's own buttons, in load order, each row from the left, going up; up to 45 (more are hidden). They hide when the plugin is switched off. Code: [cookbook.md](cookbook.md#put-a-button-into-the-esc-menu).
+- Putting an item into another game menu: an item has one parent. Each frame, if `Parent(item) != target`, call `AddChild`, then `Show`. Code: [cookbook.md](cookbook.md#put-a-button-into-another-game-menu).
 - Coordinates: a 2560×1440 canvas, (0,0) at the center, +y up. Don't compute screen positions from `GUI::Item::m_globalOrigin`.
 
 ## Input
@@ -126,15 +129,26 @@ game build, everything returns NULL, 0, `""` or `DK2ML_ERROR`.
 | Is a game menu open (ignores captures) | `api->IsGameMenuOpen()` / `dk2ml::GameMenuOpen(api)` |
 | Keep clicks and keys off the map while your UI is open | `api->CaptureGameInput(1)`, then `0` when closed / `dk2ml::CaptureInput(api, bool)` |
 | Rebindable key | `DK2ML_OPTION_KEY` ([Options](#options)). The Modloader screen marks a key bound by another plugin too with "(also <mod>)", so pick unusual defaults |
+| Key combination (Ctrl+Z) | A `DK2ML_OPTION_KEY` holds one key: pair it with a `DK2ML_OPTION_CHOICE` modifier (None/Ctrl/Shift/Alt), or capture the whole combination in your own window. Act only when exactly that modifier is held (R27) |
 | Game window (HWND) | `api->GetGameWindow()`, NULL before it exists |
 
 Hotkey pattern: in `FRAME`, `down = IsGameFocused() && (GetAsyncKeyState(vk) & 0x8000)`. Act on `down && !wasDown`,
 then store `wasDown = down`. Skip while `IsGameMenuOpen()`. There's no API for "the player is typing".
 
+A plain key MUST NOT act while Ctrl or Alt is held (R27): that press is another mod's or the game's combination. Keep
+`wasDown` on the raw state, so a key held through the combination waits for its next press:
+```cpp
+bool down = api->IsGameFocused() && (GetAsyncKeyState(vk) & 0x8000) != 0;
+bool chord = vk != VK_CONTROL && vk != VK_MENU && ((GetAsyncKeyState(VK_CONTROL) | GetAsyncKeyState(VK_MENU)) & 0x8000);
+if (down && !wasDown && !chord) { /* act */ }
+wasDown = down;
+```
+A combination hotkey instead checks that exactly its modifiers are held (Ctrl, Shift and Alt each down or up as bound).
+
 ## Threads and tasks
 | Call | Allowed from |
 |---|---|
-| `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface` | init only |
+| `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface`, `AddMenuButton` | init only |
 | `CreateSafeHook` | init, or any thread later |
 | `EnableHook`, `DisableHook`, `Log`, lookups, `GetInterface`, `AddTask` | any thread, any time |
 | GUI kit, game functions, ImGui | main thread only |
@@ -166,5 +180,5 @@ Plugin-to-plugin function tables.
 | Plugin and mod paths | `info->pluginPath`, `info->pluginDir`, `info->modDir` | read-only use (R16). `modDir` is empty for `mods_native` |
 | Game state | `api->GetGameState()` | -1 = no GameClient |
 | Game version | `api->GetGameVersion()` | e.g. 112, 0 if unknown |
-| Loader API version | `api->apiVersion` | `DK2ML_API_VERSION` |
+| Loader API version | `api->apiVersion` | `DK2ML_API_VERSION` (2 added `AddMenuButton`) |
 | Manifest | `DK2ML_PLUGIN_MANIFEST(minApi, name, version, author, url, gameVersion)` | file scope, once. Read without running code |

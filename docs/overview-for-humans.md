@@ -20,6 +20,9 @@ So every hook goes through `CreateSafeHook`, which saves and restores every regi
 ### Events
 Mission starting, GUI reloading, frames, etc relevant. The loader hooks those once and hands them out as events (`FRAME`, `STATE_CHANGED`, `MAP_LOADED`, `GUI_LOADED`, `WINDOW_RESIZED`, `PLUGINS_LOADED`, and the game's own GUI events).
 
+### Esc-menu buttons
+Plugins with in-mission settings put a button in the Esc menu with `AddMenuButton` (API 2). The loader makes the button in both Esc menus (single missions and campaigns) and places every plugin's buttons in rows of 3 above the menu's own buttons (filled from the left, going up), so mods no longer each do this themselves and land on top of each other.
+
 ### What happens when you start the game
 1. The stub loads the loader. The loader loads the game's PDB.
 2. It reads which mods are enabled (the game's `options.xml`), plus anything in `<game>\mods_native\`.
@@ -75,7 +78,7 @@ DK2ML_EXPORT int DK2ML_PluginInit(const DK2ML_API* api, const DK2ML_PluginInfo*)
 As you'd expect, running this means any mods from the Workshop that load a DLL can run whatever code they want in your machine. There isn't much we can do to avoid that, so be responsible.
 
 ### Living with other mods
-People will run several of these mods at once. The loader keeps them out of each other's way where it can. Hooks on the same function form a chain, every plugin gets its own crash containment and settings folder, and plugins can talk through published function tables ("interfaces") instead of poking at each other's memory. It also warns about the things it can't fix: two mods shipping different DLLs with the same name, two plugins with the same file name, and two plugins defaulting to the same hotkey.
+People will run several of these mods at once. The loader keeps them out of each other's way where it can. Hooks on the same function form a chain, every plugin gets its own crash containment and settings folder, and plugins can talk through published function tables ("interfaces") instead of poking at each other's memory. It also warns about the things it can't fix: two mods shipping different DLLs with the same name, two plugins with the same file name, and two plugins defaulting to the same hotkey. Plugin authors are asked to keep out of each other's key combinations too: a mod's plain hotkey (say Z) does nothing while Ctrl or Alt is held, so another mod's Ctrl+Z doesn't set it off.
 
 ### The loader's code
 Everything lives in `loader/`:

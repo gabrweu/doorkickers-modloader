@@ -38,7 +38,7 @@ for coding agents first, people second.
 | Run code every frame, on mission start, on state change, on GUI reload, on window resize | [api-map.md](api-map.md#events) |
 | Change what a game function does (hook) | [api-map.md](api-map.md#hooks), then [symbols.md](symbols.md#calling-convention), code: [cookbook.md](cookbook.md#hook-a-function-with-pre-and-post) |
 | Add settings for the player | [api-map.md](api-map.md#options) |
-| Add or change GUI (buttons, text, menus) | [api-map.md](api-map.md#gui), code: [cookbook.md](cookbook.md#put-a-button-into-a-game-menu) |
+| Add or change GUI (buttons, text, menus) | [api-map.md](api-map.md#gui), code: [cookbook.md](cookbook.md#put-a-button-into-the-esc-menu), [other menus](cookbook.md#put-a-button-into-another-game-menu) |
 | Draw an ImGui window | [cookbook.md](cookbook.md#imgui-window) |
 | Hotkeys | [api-map.md](api-map.md#input) |
 | Work from another thread | [api-map.md](api-map.md#threads-and-tasks), code: [cookbook.md](cookbook.md#worker-thread--main-thread) |

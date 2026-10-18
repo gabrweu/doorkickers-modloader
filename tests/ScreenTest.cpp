@@ -1,5 +1,6 @@
 // The generated Modloader screen XML (loader/gui/nativemods/NativeModsScreenXml.cpp) without the game:
-// well-formed, mod text escaped, names unique, every widget reachable by its events.
+// well-formed, mod text escaped, names unique, every widget reachable by its events. Also the Esc-menu buttons
+// (loader/gui/menubuttons/MenuButtonsXml.cpp) and AddMenuButton's rules.
 #include <cstdio>
 #include <map>
 #include <regex>
@@ -7,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "../loader/gui/menubuttons/MenuButtonsXml.h"
 #include "../loader/gui/nativemods/NativeModsScreenXml.h"
 
 namespace sx = screenxml;
@@ -344,6 +346,105 @@ void TestScreenTargets(const Screen& s)
     Expect("every Show/Hide in the screen names an existing item", screenTargets);
 }
 
+// Esc-menu buttons: one item per button and menu, merged with the screen, each clicking through its own container
+void TestMenuButtons(const Screen& s)
+{
+    namespace mx = menuxml;
+    std::vector<mx::Button> buttons = {
+        {0, "Free Camera <settings> & \"more\"", "data/textures/gui/a_normal.dds", "data/textures/gui/a_hover.dds", ""},
+        {3, "", "data/textures/gui/b.dds", "", ""},
+        {7, "@menu_m_sendfeedback", "", "", "CAM & co"},
+    };
+    std::string items = mx::Items(buttons);
+    std::string doc = "<GUIItems>" + s.button + s.r.xml + items + "</GUIItems>";
+
+    std::string error;
+    bool wellFormed = WellFormed(doc, &error);
+    if (!wellFormed) {
+        printf("  %s\n", error.c_str());
+    }
+    Expect("Esc-menu buttons: XML is well-formed with the screen", wellFormed);
+
+    std::map<std::string, int> names;
+    std::regex nameAttr("name=\"([^\"]*)\"");
+    for (auto it = std::sregex_iterator(doc.begin(), doc.end(), nameAttr); it != std::sregex_iterator(); ++it) {
+        ++names[(*it)[1].str()];
+    }
+    bool unique = true;
+    bool all = true;
+    for (const mx::Button& b : buttons) {
+        for (int m = 0; m < mx::kMenuCount; ++m) {
+            all &= names[mx::ContainerName(b.id, m)] == 1 && names[mx::ButtonName(b.id, m)] == 1;
+        }
+    }
+    for (auto& [name, count] : names) {
+        unique &= count == 1;
+    }
+    Expect("Esc-menu buttons: one container and button per button and menu", all);
+    Expect("Esc-menu buttons: names unique next to the screen's", unique);
+
+    std::regex callback("<Button name=\"([^\"]*)_btn\"[\\s\\S]*?type=\"Callback\" target=\"([^\"]*)\"");
+    int callbacks = 0;
+    bool ownTarget = true;
+    for (auto it = std::sregex_iterator(items.begin(), items.end(), callback); it != std::sregex_iterator(); ++it) {
+        ++callbacks;
+        ownTarget &= (*it)[1].str() == (*it)[2].str();
+    }
+    Expect("Esc-menu buttons: each click calls back through its own container",
+           callbacks == 3 * mx::kMenuCount && ownTarget);
+
+    Expect("Esc-menu buttons: start hidden",
+           items.find("name=\"" + mx::ContainerName(0, 0) + "\" origin=\"0 0\" hidden=\"true\"") != std::string::npos);
+    Expect("Esc-menu buttons: text escaped, no game text keys",
+           items.find("Free Camera &lt;settings&gt; &amp; &quot;more&quot;") != std::string::npos &&
+               items.find("CAM &amp; co") != std::string::npos && items.find("\"@") == std::string::npos);
+    Expect("Esc-menu buttons: the hover icon, else the icon",
+           items.find("a_hover.dds") != std::string::npos && items.find("b.dds") != std::string::npos);
+
+    float x0, y0, x2, y2, x3, y3, xLast, yLast;
+    mx::SlotOrigin(0, &x0, &y0);
+    mx::SlotOrigin(2, &x2, &y2);
+    mx::SlotOrigin(3, &x3, &y3);
+    mx::SlotOrigin(mx::kSlots - 1, &xLast, &yLast);
+    Expect("Esc-menu buttons: rows of 3 above the game's row, from the left, going up",
+           x0 == -160 && y0 == 80 && x2 == 0 && y2 == 80 && x3 == -160 && y3 == 160 && xLast == 0 &&
+               yLast == 80 * mx::kRows);
+}
+
+void ToggleSomething(void*, float, float, void*) {}
+
+void TestMenuButtonCheck()
+{
+    namespace mx = menuxml;
+    DK2ML_MenuButton copy;
+    DK2ML_MenuButton b = {sizeof(b)};
+    b.icon = "data/textures/gui/x.dds";
+    b.onClick = ToggleSomething;
+    Expect("AddMenuButton: an icon and onClick are enough", mx::Check(&b, &copy) == nullptr && copy.icon == b.icon);
+
+    DK2ML_MenuButton noClick = b;
+    noClick.onClick = nullptr;
+    DK2ML_MenuButton nothing = b;
+    nothing.icon = "";
+    DK2ML_MenuButton label = nothing;
+    label.label = "CAM";
+    DK2ML_MenuButton small = b;
+    small.structSize = 8;
+    Expect("AddMenuButton: refuses no onClick, no icon or label, a short struct",
+           mx::Check(&noClick, &copy) && mx::Check(&nothing, &copy) && mx::Check(&small, &copy) &&
+               mx::Check(nullptr, &copy));
+    Expect("AddMenuButton: a label instead of an icon", mx::Check(&label, &copy) == nullptr);
+
+    struct Bigger {
+        DK2ML_MenuButton b;
+        int future;
+    } bigger = {b, 1};
+
+    bigger.b.structSize = sizeof(bigger);
+    Expect("AddMenuButton: a bigger struct, extra fields ignored",
+           mx::Check(&bigger.b, &copy) == nullptr && copy.onClick == ToggleSomething);
+}
+
 } // namespace
 
 int main()
@@ -359,6 +460,8 @@ int main()
     TestWheel(s);
     TestMainMenuButton(s);
     TestScreenTargets(s);
+    TestMenuButtons(s);
+    TestMenuButtonCheck();
 
     printf(g_failures ? "%d FAILED\n" : "all passed\n", g_failures);
     return g_failures ? 1 : 0;

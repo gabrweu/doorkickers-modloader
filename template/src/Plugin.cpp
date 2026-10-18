@@ -109,8 +109,11 @@ void OnFrame(const DK2ML_Event*, void*)
 {
     // GetAsyncKeyState also sees keys pressed in other windows
     bool down = g_api->IsGameFocused() && (GetAsyncKeyState(g_hotkey) & 0x8000) != 0;
+    // Ctrl or Alt held: another mod's or the game's key combination, not this key (rules R27)
+    bool chord = g_hotkey != VK_CONTROL && g_hotkey != VK_MENU &&
+                 ((GetAsyncKeyState(VK_CONTROL) | GetAsyncKeyState(VK_MENU)) & 0x8000) != 0;
 
-    if (down && !g_hotkeyWasDown) {
+    if (down && !g_hotkeyWasDown && !chord) {
         g_enabled = !g_enabled;
         SaveSettings(nullptr, nullptr);
         g_api->Log("toggled: enabled=%d", g_enabled);

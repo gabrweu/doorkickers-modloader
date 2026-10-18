@@ -67,6 +67,7 @@ Symptom → cause → fix. Exact output strings are in code spans. `<...>` marks
 | Clicks on the plugin's UI also act on the map | input not captured | `CaptureGameInput(1)` while open, `0` when closed |
 | A hotkey fires in other windows | `GetAsyncKeyState` is global | Check `IsGameFocused()` |
 | A hotkey repeats while held | acting on the "down" state | Act on the press edge |
+| A hotkey also fires inside another mod's Ctrl/Alt combination (e.g. Ctrl+Z turns the camera) | the key is read without looking at modifiers | Ignore it while Ctrl or Alt is held (R27) |
 | Settings lost after a Workshop update | saved in the mod folder | Save in `GetConfigDir()` (R16) |
 | A value jitters | another mod writes the same field | Write only while the feature is active. Back off if the value isn't what you last wrote |
 | `<name>.dll crashed in its <where> (exception 0x<code>)`, then `... switched off for this session` | a crash in a callback | Fix the crash. The plugin stays off until the game restarts |

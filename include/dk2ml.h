@@ -29,7 +29,7 @@ extern "C" {
 #define DK2ML_INLINE static __inline
 #endif
 
-#define DK2ML_API_VERSION 1
+#define DK2ML_API_VERSION 2
 
 typedef enum DK2ML_Status {
     DK2ML_OK = 0,
@@ -243,10 +243,29 @@ typedef void (*DK2ML_TaskFn)(void* user);
 /* item: the event's item (a clone for clones). cursorX/Y: GUI coordinates (2560x1440, (0,0) at the center, +y up). */
 typedef void (*DK2ML_GuiCallbackFn)(void* item, float cursorX, float cursorY, void* user);
 
-/* Threading: AddOption, Subscribe, SubscribeGuiEvent and PublishInterface only during DK2ML_PluginInit. Create hooks
- * there too; CreateSafeHook also works later, from any thread. EnableHook/DisableHook, Log, the PDB lookups
- * (ResolveSymbol, GetFieldOffset, GetTypeSize, GetEnumValue), GetInterface and AddTask: any thread, any time. GUI kit:
- * main thread only. */
+/* --- Esc-menu buttons (API 2) ---
+ * AddMenuButton puts a square button into the in-mission Esc menus (single missions and campaigns), in the rows of 3
+ * above the menu's own buttons that every plugin shares: in load order, then call order, each row from the left, going
+ * up; up to 45 (more are hidden). The loader
+ * makes, places and shows the items, so the plugin ships no GUI XML for it. onClick runs on the main thread,
+ * crash-contained; a switched-off plugin's buttons disappear. AddMenuButton returns DK2ML_ERROR (logged) for structSize
+ * < this sizeof(DK2ML_MenuButton), a NULL onClick, or neither icon nor label. On an API 1 loader the field is missing:
+ * check api->structSize > offsetof(DK2ML_API, AddMenuButton), or declare DK2ML_PLUGIN_MANIFEST(2, ...). */
+typedef struct DK2ML_MenuButton {
+    uint32_t structSize;   /* sizeof(DK2ML_MenuButton); bigger is accepted, extra fields ignored */
+    const char* tooltip;   /* optional; copied, up to 512 bytes */
+    const char* icon;      /* optional: texture path as in GUI XML, e.g. "data/textures/gui/x_normal.dds", from the
+                            * mod's folder like its other files; drawn 64x64. NULL: label instead. Copied. */
+    const char* iconHover; /* optional (NULL: icon); copied */
+    const char* label;     /* without an icon: a short text, e.g. "CAM"; copied, up to 512 bytes */
+    DK2ML_GuiCallbackFn onClick; /* item: the clicked button; Esc stays open */
+    void* user;
+} DK2ML_MenuButton;
+
+/* Threading: AddOption, Subscribe, SubscribeGuiEvent, PublishInterface and AddMenuButton only during
+ * DK2ML_PluginInit. Create hooks there too; CreateSafeHook also works later, from any thread. EnableHook/DisableHook,
+ * Log, the PDB lookups (ResolveSymbol, GetFieldOffset, GetTypeSize, GetEnumValue), GetInterface and AddTask: any
+ * thread, any time. GUI kit: main thread only. */
 typedef struct DK2ML_API {
     uint32_t apiVersion; /* the loader's DK2ML_API_VERSION */
     uint32_t structSize; /* sizeof(DK2ML_API) of the loader */
@@ -362,6 +381,11 @@ typedef struct DK2ML_API {
 
     /* Non-zero if one of the game's own menus is open, ignoring captures. */
     int (*IsGameMenuOpen)(void);
+
+    /* --- API 2 --- */
+
+    /* Adds a button to the Esc menus (see "Esc-menu buttons"). Init only; later: DK2ML_ERROR. */
+    DK2ML_Status (*AddMenuButton)(const DK2ML_MenuButton* button);
 } DK2ML_API;
 
 typedef struct DK2ML_PluginInfo {
