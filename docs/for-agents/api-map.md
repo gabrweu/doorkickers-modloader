@@ -127,7 +127,7 @@ game build, everything returns NULL, 0, `""` or `DK2ML_ERROR`.
 |---|---|
 | Is the game window focused | `api->IsGameFocused()`. Check it before `GetAsyncKeyState`, which sees keys from every window |
 | Is a game menu open (ignores captures) | `api->IsGameMenuOpen()` / `dk2ml::GameMenuOpen(api)` |
-| Keep clicks and keys off the map while your UI is open | `api->CaptureGameInput(1)`, then `0` when closed / `dk2ml::CaptureInput(api, bool)` |
+| Keep clicks and keys on your ImGui window off the game | `api->CaptureGameInput(1)` / `0`, or `dk2ml::CaptureInput(api, bool)`, only while ImGui uses the input (R28, [pattern](#imgui-window-input)) |
 | Rebindable key | `DK2ML_OPTION_KEY` ([Options](#options)). The Modloader screen marks a key bound by another plugin too with "(also <mod>)", so pick unusual defaults |
 | Key combination (Ctrl+Z) | A `DK2ML_OPTION_KEY` holds one key: pair it with a `DK2ML_OPTION_CHOICE` modifier (None/Ctrl/Shift/Alt), or capture the whole combination in your own window. Act only when exactly that modifier is held (R27) |
 | Game window (HWND) | `api->GetGameWindow()`, NULL before it exists |
@@ -144,6 +144,32 @@ if (down && !wasDown && !chord) { /* act */ }
 wasDown = down;
 ```
 A combination hotkey instead checks that exactly its modifiers are held (Ctrl, Shift and Alt each down or up as bound).
+
+### ImGui window input
+Capture makes the game's `IsAnyMenuOpened` true, so the game takes no clicks or keys at all: no selecting troopers, no
+HUD. Capture only while ImGui uses the input (R28). ImGui sets `WantCaptureMouse` (the mouse over one of its windows,
+or an item held) and `WantCaptureKeyboard` (an item active, text typed) in its NewFrame, and `FRAME` runs after it, so
+the flags are the current frame's. `ImGui::GetIO` was inlined away, so they're read through the context:
+```cpp
+dk2ml::Global<void*> GImGui{"GImGui"}; // ImGuiContext*
+dk2ml::Field<uint8_t> ImGuiContext_IO{"ImGuiContext", "IO"}; // ImGuiIO, inside the context
+dk2ml::Field<bool> ImGuiIO_WantCaptureMouse{"ImGuiIO", "WantCaptureMouse"};
+dk2ml::Field<bool> ImGuiIO_WantCaptureKeyboard{"ImGuiIO", "WantCaptureKeyboard"};
+
+bool g_capturing = false;
+
+// in FRAME, before drawing the window
+void* context = *GImGui;
+int io = ImGuiContext_IO.Offset();
+bool capture = g_windowOpen && context &&
+               (g_waitingForKeyToBind || dk2ml::At<bool>(context, io + ImGuiIO_WantCaptureMouse.Offset()) ||
+                dk2ml::At<bool>(context, io + ImGuiIO_WantCaptureKeyboard.Offset()));
+if (capture != g_capturing && dk2ml::CaptureInput(api, capture)) {
+    g_capturing = capture;
+}
+```
+Another plugin's ImGui window under the mouse sets the flags too. That's harmless: the game only loses the clicks
+that land on an ImGui window.
 
 ## Threads and tasks
 | Call | Allowed from |

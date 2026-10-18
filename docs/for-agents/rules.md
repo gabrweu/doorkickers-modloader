@@ -45,3 +45,8 @@ Hard rules for dk2ml plugin code. Cite them by number. Each has its reason, so e
   - Shift is the plugin's call. The game itself uses Shift + key for team-wide variants.
   - A hotkey bound to Ctrl or Alt itself is read as is.
   - Pattern: [api-map.md](api-map.md#input).
+- **R28. An ImGui window MUST capture game input only while ImGui uses it, NEVER just because it's open.** `CaptureGameInput(1)` makes the game's `IsAnyMenuOpened` return true, so the game ignores the map and the HUD. A window that captures for as long as it's open leaves the player unable to select a trooper or click the HUD.
+  - Capture while `ImGuiIO::WantCaptureMouse` or `WantCaptureKeyboard` is set: the mouse is over an ImGui window, an item is held (a slider dragged past the window's edge still counts), or a value is being typed. Also capture while the window waits for a key to bind. Release otherwise, and when the window closes.
+  - `ImGui::GetIO` was inlined away. Read the flags through `GImGui` → `ImGuiContext::IO`.
+  - A window meant to be modal, where the game should stop while it's open, may capture while open. Say so in a comment.
+  - Pattern: [api-map.md](api-map.md#imgui-window-input).

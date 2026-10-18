@@ -39,3 +39,5 @@ The default game folder is `C:\Program Files (x86)\Steam\steamapps\common\DoorKi
 9. A change is done only when the dry run passes (R22). In-game behavior is unverified until the human tests it.
 10. Never launch or kill the game, never publish, never commit PDB dumps or disassembly (R23–R25).
 11. Hotkeys: a plain key does nothing while Ctrl or Alt is held; a combination checks exactly its modifiers (R27).
+12. ImGui windows capture game input only while ImGui uses it (`WantCaptureMouse` / `WantCaptureKeyboard`), never just
+    because they're open (R28).

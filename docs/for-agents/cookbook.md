@@ -91,8 +91,9 @@ b.onClick = [](void*, float, float, void*) { g_windowOpen = !g_windowOpen; };
 dk2ml::gui::AddMenuButton(api, b);
 ```
 Declare `DK2ML_PLUGIN_MANIFEST(2, ...)`, or check the result: on an API 1 loader `gui::AddMenuButton` returns false.
-Esc stays open after the click, so an ImGui window opened from it should capture input
-([api-map.md](api-map.md#input)).
+Esc stays open after the click, so clicks on an ImGui window opened from it would also reach the Esc menu below.
+Capture input while ImGui uses it, not for as long as the window is open (R28,
+[api-map.md](api-map.md#imgui-window-input)).
 
 ## Put a button into another game menu
 The XML item goes in `mod\gui\<file>.xml` with a prefixed name (R18). An item has one parent, so move it every frame
@@ -136,7 +137,7 @@ ImGui's frame.
 - Some were inlined away and don't exist, among them `SetNextWindowPos`, `CollapsingHeader` and `PopID`. Check with `--find "ImGui::*"`, and use the underlying function: `ButtonEx` for `Button`, `SliderScalar` for `SliderFloat`, `SeparatorEx` for `Separator`.
 - Bind flags by name. `ImGuiWindowFlags_` and the other flag enums are in the PDB (`--enum ImGuiWindowFlags_`), and their values change between ImGui versions (R2).
 - Match ImGui's types exactly (`struct ImVec2 { float x, y; };`), and pass by reference where the real signature does: `ButtonEx(const char*, const ImVec2&, int)` takes a pointer.
-- Clicks on the window also reach the map. Capture input while the window is open ([api-map.md](api-map.md#input)).
+- Clicks on the window also reach the map. Capture input while ImGui uses it (`WantCaptureMouse` / `WantCaptureKeyboard`), not while the window is open: a capture blocks the whole map and HUD (R28, [api-map.md](api-map.md#imgui-window-input)).
 - The Modloader screen exists only on the main menu, so in-mission settings need a window like this, opened from an
   [Esc-menu button](#put-a-button-into-the-esc-menu). Free Camera has one.
 
