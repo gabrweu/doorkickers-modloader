@@ -243,6 +243,19 @@ void ResolveServices()
     }
 
     svc.onWindowResized = sym("WINDOW_RESIZED", "?OnWindowResized@GameRenderer@@QEAAXHHH@Z");
+
+    svc.stopRecording = sym("replay data", "Replay::StopRecording");
+    svc.requestReplayStart = sym("replay data", "GameClient::RequestReplayStart");
+    svc.clientFlags = Symbols_FieldOffset("GameClient", "m_flags");
+    if (svc.clientFlags < 0) {
+        LogF("IsReplaying: missing field GameClient::m_flags");
+    }
+    if (!Symbols_EnumValue("GameClient::eCGameFlags", "CGAMEFLAG_REPLAYING", &svc.flagReplaying)) {
+        LogF("IsReplaying: missing enum GameClient::eCGameFlags::CGAMEFLAG_REPLAYING");
+        svc.flagReplaying = 0;
+    }
+
+    svc.printTextVarg = sym("version label", "Render2D::PrintText_varg");
 }
 
 namespace {
@@ -300,7 +313,51 @@ uint32_t VersionIn(const char* function)
     return 0;
 }
 
+// p is `lea r64, [rip+d]` (48/4C 8D, modrm 00 reg 101) to "v%s"
+bool LeaVersionFormat(const uint8_t* p)
+{
+    uint8_t b[7];
+    if (!ReadCode(p, b, sizeof(b)) || (b[0] != 0x48 && b[0] != 0x4C) || b[1] != 0x8D || (b[2] & 0xC7) != 0x05) {
+        return false;
+    }
+
+    int32_t d;
+    memcpy(&d, b + 3, 4);
+    char text[4] = {};
+    return ReadCode(p + 7 + d, text, sizeof(text)) && memcmp(text, "v%s", 4) == 0;
+}
+
 } // namespace
+
+// build 112: RenderStats +0xF2, the lea 0x14 bytes before the call
+uintptr_t FindVersionLabelCall()
+{
+    auto* code = static_cast<const uint8_t*>(Symbols_Resolve("GameRenderer::RenderStats"));
+    auto* printText = static_cast<const uint8_t*>(svc.printTextVarg);
+    if (code && printText) {
+        constexpr int kSpan = 0x1000;
+        constexpr int kNear = 0x30;
+        for (int i = kNear; i < kSpan; ++i) {
+            uint8_t b[5];
+            if (!ReadCode(code + i, b, sizeof(b)) || b[0] != 0xE8) {
+                continue;
+            }
+            int32_t d;
+            memcpy(&d, b + 1, 4);
+            if (code + i + 5 + d != printText) {
+                continue;
+            }
+            for (int j = i - kNear; j < i; ++j) {
+                if (LeaVersionFormat(code + j)) {
+                    return reinterpret_cast<uintptr_t>(code + i + 5);
+                }
+            }
+        }
+    }
+
+    LogF("version label: not found in GameRenderer::RenderStats (the modloader version isn't shown there)");
+    return 0;
+}
 
 uint32_t FindGameVersion()
 {

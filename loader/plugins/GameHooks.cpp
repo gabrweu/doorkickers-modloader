@@ -103,6 +103,54 @@ void OnWindowResizedPost(DK2ML_Regs*, void*)
     Events_DispatchResize(client, state, rect.right - rect.left, rect.bottom - rect.top);
 }
 
+// Replay data (Replays.cpp). Watching right after a mission, StopRecording runs inside RequestReplayStart.
+std::wstring g_userDir; // Plugins_SaveDir: the game's folder under %LOCALAPPDATA%
+
+int StopRecordingPre(DK2ML_Regs*, void*)
+{
+    Replays_OnStopRecordingPre(g_userDir);
+    return DK2ML_CALL_ORIGINAL;
+}
+
+void StopRecordingPost(DK2ML_Regs*, void*)
+{
+    Replays_OnStopRecordingPost(g_userDir);
+}
+
+int ReplayStartPre(DK2ML_Regs* r, void*)
+{
+    Replays_OnReplayStartPre(g_userDir, reinterpret_cast<const char*>(r->rdx)); // the path
+    return DK2ML_CALL_ORIGINAL;
+}
+
+void ReplayStartPost(DK2ML_Regs*, void*)
+{
+    Replays_OnReplayStartPost();
+}
+
+// both or neither: saving without loading would only grow the files
+bool InstallReplayHooks()
+{
+    if (!svc.stopRecording || !svc.requestReplayStart) {
+        return false;
+    }
+    g_userDir = Plugins_SaveDir();
+    if (g_userDir.empty()) {
+        LogF("replay data: the game's user folder (%%LOCALAPPDATA%%\\KillHouseGames\\DoorKickers2) is unknown");
+        return false;
+    }
+
+    if (!GameHooks_Install(svc.stopRecording, StopRecordingPre, StopRecordingPost, "Replay::StopRecording")) {
+        return false;
+    }
+    bool start =
+        GameHooks_Install(svc.requestReplayStart, ReplayStartPre, ReplayStartPost, "GameClient::RequestReplayStart");
+    if (!start) {
+        SafeHook_SetEnabled(svc.stopRecording, Self(), false);
+    }
+    return start;
+}
+
 bool g_captureHooked = false;
 
 bool AnyPluginRunning()
@@ -112,6 +160,18 @@ bool AnyPluginRunning()
         anyRunning |= e.status == ModStatus::Loaded;
     }
     return anyRunning;
+}
+
+// The game's version label (GameRenderer::RenderStats, "v%s" + "1.12"): the same call with our format
+constexpr char kVersionLabel[] = "v%s \xC2\xB7 Modloader " DK2ML_VERSION; // middle dot (UTF-8)
+uintptr_t g_versionLabelReturn = 0;
+
+int PrintTextPre(DK2ML_Regs* r, void*)
+{
+    if (r->stack[0] == g_versionLabelReturn) {
+        r->stack[5] = reinterpret_cast<uint64_t>(kVersionLabel); // arg 4, the format
+    }
+    return DK2ML_CALL_ORIGINAL;
 }
 
 // plugins made for another game version: shown, not enforced
@@ -157,6 +217,15 @@ int GameHooks_IsGameMenuOpen()
     return open ? 1 : 0;
 }
 
+int GameHooks_IsReplaying()
+{
+    void* client = ev.gameClient ? *ev.gameClient : nullptr;
+    if (!client || svc.clientFlags < 0 || !svc.flagReplaying) {
+        return 0;
+    }
+    return (Field<uint32_t>(client, svc.clientFlags) & static_cast<uint32_t>(svc.flagReplaying)) != 0 ? 1 : 0;
+}
+
 int64_t GameHooks_GameState(void** gameClient)
 {
     void* client = ev.gameClient ? *ev.gameClient : nullptr;
@@ -193,6 +262,11 @@ void GameHooks_Init()
     bool resized = resizedWanted && GameHooks_Install(svc.onWindowResized, nullptr, OnWindowResizedPost,
                                                       "GameRenderer::OnWindowResized");
 
+    g_versionLabelReturn = svc.printTextVarg ? FindVersionLabelCall() : 0;
+    if (g_versionLabelReturn) {
+        GameHooks_Install(svc.printTextVarg, PrintTextPre, nullptr, "Render2D::PrintText_varg");
+    }
+
     // CaptureGameInput is a runtime call, so hook whenever plugins run
     bool canCapture = svc.isAnyMenuOpened && svc.gameGui;
     if (AnyPluginRunning() && canCapture) {
@@ -219,6 +293,13 @@ void GameHooks_Init()
         }
     }
     Events_LogSubscribers();
+
+    if (Replays_Wanted()) {
+        Replays_Log();
+        if (!InstallReplayHooks()) {
+            LogF("replay data: not available in this game build (see above): plugins' data isn't saved into replays");
+        }
+    }
 
     LogGameVersion();
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2026-10-23 (plugin API 3)
+- Added API for adding mod data to replay files. So, if you turn lasers on in-mission, for example, the same actions will play back during the replay.
+- Added string showing the Modloader version to the main menu.
+
 ## [1.1.0] - 2026-10-18 (plugin API 2)
 - Added API for adding buttons to the bottom-right of the ESC menu so plugins don't fight for spots.
 - Removed option to disallow mods on the starting prompt as that was a bit confusing for players and generally undercooked. Now you can either abort the game launch or allow the mods the first time it pops up; remove the mod if you don't want to use it.

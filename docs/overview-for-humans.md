@@ -23,6 +23,9 @@ Mission starting, GUI reloading, frames, etc relevant. The loader hooks those on
 ### Esc-menu buttons
 Plugins with in-mission settings put a button in the Esc menu with `AddMenuButton` (API 2). The loader makes the button in both Esc menus (single missions and campaigns) and places every plugin's buttons in rows of 3 above the menu's own buttons (filled from the left, going up), so mods no longer each do this themselves and land on top of each other.
 
+### Replay data
+A replay repeats the orders the game recorded, not what a mod changed (a laser switched on mid-mission, say). With `AddReplayData` (API 3) a plugin keeps its own data in the replay file: the loader asks every plugin for its bytes right after the game writes the file, appends them in one block after the game's data (the game stops reading before it), and hands each plugin its bytes back when that replay plays, also after the player saved it under a name. One block with a section per plugin, so mods don't overwrite each other's data.
+
 ### What happens when you start the game
 1. The stub loads the loader. The loader loads the game's PDB.
 2. It reads which mods are enabled (the game's `options.xml`), plus anything in `<game>\mods_native\`.

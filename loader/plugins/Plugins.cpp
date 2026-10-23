@@ -234,6 +234,7 @@ void DisableHooksOf(HMODULE owner)
     Events_FaultOwner(owner);      // its events and waiting tasks
     Interfaces_FaultOwner(owner);  // its tables point into switched-off code
     Gui_FaultOwner(owner);         // GUI callbacks inert, input capture released
+    Replays_FaultOwner(owner);     // no more replay data saves or loads
 }
 
 // Switched off for the session. Their threads may still call the API, so CreateSafeHook and EnableHook refuse them.
@@ -586,6 +587,21 @@ __declspec(noinline) DK2ML_Status Api_AddMenuButton(const DK2ML_MenuButton* butt
     return MenuButtons_Add(owner, button);
 }
 
+__declspec(noinline) DK2ML_Status Api_AddReplayData(const DK2ML_ReplayData* data)
+{
+    return Replays_Add(ModuleAt(_ReturnAddress()), data);
+}
+
+__declspec(noinline) DK2ML_Status Api_ReplayWrite(DK2ML_ReplayWriter* out, const void* data, size_t size)
+{
+    return Replays_Write(ModuleAt(_ReturnAddress()), out, data, size);
+}
+
+int Api_IsReplaying()
+{
+    return GameHooks_IsReplaying();
+}
+
 uint32_t Api_GetGameVersion()
 {
     return GuiKit_GameVersion();
@@ -597,7 +613,7 @@ void* Api_GetGameWindow()
 }
 
 // positional: a new DK2ML_API field without an entry here would be NULL
-static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, AddMenuButton) + sizeof(void*),
+static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, IsReplaying) + sizeof(void*),
               "DK2ML_API grew: add the new fields");
 const DK2ML_API g_api = {
     DK2ML_API_VERSION,
@@ -636,6 +652,9 @@ const DK2ML_API g_api = {
     Api_CaptureGameInput,
     Api_IsGameMenuOpen,
     Api_AddMenuButton,
+    Api_AddReplayData,
+    Api_ReplayWrite,
+    Api_IsReplaying,
 };
 
 // --- loading ---
@@ -944,6 +963,7 @@ void SetLoaderCallbacks()
     SafeHook_SetTargetNamer(Symbols_NameAt);
     Events_SetCrashCallback(OnEventCrash);
     Gui_SetCrashCallback(OnEventCrash); // GuiThunks.cpp already logged it
+    Replays_SetCrashCallback(OnEventCrash);
 }
 
 // Only the player's own mod folders load without asking. Compared after resolving links: a junction can't fake local.
@@ -1083,6 +1103,7 @@ void SetRegistrationOpen(bool open)
     g_optionsOpen = open;
     Events_SetOpen(open);     // subscriptions, like options, only during init
     Interfaces_SetOpen(open); // published only now, looked up only after
+    Replays_SetOpen(open);
 }
 
 // One copy per plugin file name: a duplicate would hook everything twice and share one GetConfigDir.

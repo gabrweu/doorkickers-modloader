@@ -12,6 +12,7 @@ functions, events, tasks and GUI callbacks.
 | A button in the Esc menu (e.g. to open in-mission settings) | `AddMenuButton` | [GUI](#gui) |
 | Buttons, text, menus | GUI XML in `mod\gui\` + GUI kit | [GUI](#gui) |
 | Player settings | `AddOption` | [Options](#options) |
+| State a replay should repeat (a switch the player flipped mid-mission) | `AddReplayData` | [Replays](#replays) |
 | Read or write game state | bindings + `Field` | [symbols.md](symbols.md#binding-dk2mlhpp) |
 | Call a game function | `dk2ml::Fn` | [symbols.md](symbols.md#binding-dk2mlhpp) |
 | Change what a game function does, or observe one no event covers | safe hook | [Hooks](#hooks) |
@@ -171,13 +172,34 @@ if (capture != g_capturing && dk2ml::CaptureInput(api, capture)) {
 Another plugin's ImGui window under the mouse sets the flags too. That's harmless: the game only loses the clicks
 that land on an ImGui window.
 
+## Replays
+A replay repeats the orders the game recorded, not what a plugin changed. To have a replay repeat a plugin's state too,
+keep it in the replay file (API 3). The loader appends one block after the game's data, where the game stops reading,
+with each plugin's bytes under its key. The block goes along when the player saves the replay under a name.
+
+| Task | C | C++ | When | Failure |
+|---|---|---|---|---|
+| Keep data in replays | `AddReplayData(&data)` | `dk2ml::AddReplayData(api, key, save, load, user)` | init | `DK2ML_ERROR`, logged; false on an API 1/2 loader |
+| Write in `save` | `ReplayWrite(out, data, size)` | `dk2ml::ReplayOut w{api, out}; w.Put<T>(v)` | inside `save` only | `DK2ML_ERROR`, logged; past 1 MiB nothing of it is stored |
+| Read in `load` | `data`, `size` | `dk2ml::ByteReader r{data, size}; r.Get(&v)` | inside `load` | `Get` false once the data runs out |
+| Is a replay playing | `IsReplaying()` | `dk2ml::IsReplaying(api)` | main | 0/false without a GameClient or on an API 1/2 loader |
+
+- `save(out, user)` runs when the game has just written the mission's replay file (`last_replay_N.rpl`): write the mission's data. Nothing written: nothing stored.
+- `load(data, size, user)` runs when a replay starts, restarts or is skipped through: that key's bytes, or NULL and 0 if the replay has none (an older replay, or the plugin wasn't running). Reset to the defaults then. `data` is valid only during the call.
+- Keep the replay's state apart from what the mission records. Watching right after a mission, `save` runs during the replay's start and `load` then gets those bytes. `load` can run more than once per start, its order with `MAP_LOADED` isn't fixed, and `IsReplaying` may not be set yet inside it.
+- The bytes may come from another player's replay file: check every count and size, and read flags as integers (`ByteReader::Get` refuses `bool` and enums).
+- The key is 1–63 printable ASCII characters without spaces, e.g. `author.mod`. Never change it: replays saved with it are read back by it.
+- The bytes are the plugin's own format. Start them with a version number and skip what a newer version added.
+- Record changes with the game time (`GameCommon::m_gameTime`) and, while replaying, work out the state at the current game time from the start each time: the player can skip back. Code: [cookbook.md](cookbook.md#repeat-a-plugins-state-in-replays).
+- `save` and `load` are crash-contained. They don't run once the plugin is switched off. If this game build lacks the replay names, the loader logs it and neither runs.
+
 ## Threads and tasks
 | Call | Allowed from |
 |---|---|
-| `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface`, `AddMenuButton` | init only |
+| `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface`, `AddMenuButton`, `AddReplayData` | init only |
 | `CreateSafeHook` | init, or any thread later |
 | `EnableHook`, `DisableHook`, `Log`, lookups, `GetInterface`, `AddTask` | any thread, any time |
-| GUI kit, game functions, ImGui | main thread only |
+| GUI kit, game functions, ImGui, `ReplayWrite`, `IsReplaying` | main thread only |
 
 - `AddTask(fn, user)` / `dk2ml::Post(api, fn, user)` runs `fn(user)` on the main thread at the start of the next frame, under crash containment, in the order added. `user` must stay valid until it runs.
 - Failure: `DK2ML_ERROR` if fn is NULL, 4096 tasks are queued, the plugin was switched off, or this game build has no frame tick.
@@ -206,5 +228,5 @@ Plugin-to-plugin function tables.
 | Plugin and mod paths | `info->pluginPath`, `info->pluginDir`, `info->modDir` | read-only use (R16). `modDir` is empty for `mods_native` |
 | Game state | `api->GetGameState()` | -1 = no GameClient |
 | Game version | `api->GetGameVersion()` | e.g. 112, 0 if unknown |
-| Loader API version | `api->apiVersion` | `DK2ML_API_VERSION` (2 added `AddMenuButton`) |
+| Loader API version | `api->apiVersion` | `DK2ML_API_VERSION` (2 added `AddMenuButton`; 3 added `AddReplayData`, `ReplayWrite`, `IsReplaying`) |
 | Manifest | `DK2ML_PLUGIN_MANIFEST(minApi, name, version, author, url, gameVersion)` | file scope, once. Read without running code |

@@ -233,6 +233,28 @@ DK2ML_Status StubAddMenuButton(const DK2ML_MenuButton* button)
     return DK2ML_OK;
 }
 
+std::set<std::string> g_replayKeys;
+
+DK2ML_Status StubAddReplayData(const DK2ML_ReplayData* data)
+{
+    if (const char* error = Replays_Check(data)) {
+        Problem("AddReplayData: %s", error);
+        return DK2ML_ERROR;
+    }
+    if (!g_replayKeys.insert(data->key).second) {
+        Problem("AddReplayData(\"%s\"): added twice", data->key);
+        return DK2ML_ERROR;
+    }
+    printf("  [dry run] keeps replay data \"%s\"\n", data->key);
+    return DK2ML_OK;
+}
+
+DK2ML_Status StubReplayWrite(DK2ML_ReplayWriter*, const void*, size_t)
+{
+    Problem("ReplayWrite during init: it only works inside a replay data save callback");
+    return DK2ML_ERROR;
+}
+
 void TestLog(const char* fmt, ...)
 {
     va_list args;
@@ -256,7 +278,7 @@ const wchar_t* TestConfigDir()
 }
 
 // Field by field, independent of order. The assert catches a new DK2ML_API field missing here.
-static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, AddMenuButton) + sizeof(void*),
+static_assert(sizeof(DK2ML_API) == offsetof(DK2ML_API, IsReplaying) + sizeof(void*),
               "DK2ML_API grew: fill the new fields");
 
 DK2ML_API MakeTestApi()
@@ -300,6 +322,9 @@ DK2ML_API MakeTestApi()
     api.GetGameVersion = []() { return gameui::FindGameVersion(); };
     api.GetGameWindow = []() -> void* { return nullptr; }; // no window in a dry run
     api.AddMenuButton = StubAddMenuButton;
+    api.AddReplayData = StubAddReplayData;
+    api.ReplayWrite = StubReplayWrite;
+    api.IsReplaying = []() { return 0; }; // no game running
     return api;
 }
 
@@ -563,6 +588,15 @@ void CheckServices()
         printf("WINDOW_RESIZED: GameRenderer::OnWindowResized is FOLDED with other functions, see above\n");
     }
 
+    bool replayOk = svc.stopRecording && svc.requestReplayStart;
+    printf("replay data: %s; IsReplaying: %s\n", OkOrMissing(replayOk),
+           OkOrMissing(svc.clientFlags >= 0 && svc.flagReplaying));
+    for (void* target : {svc.stopRecording, svc.requestReplayStart}) {
+        if (target && Symbols_WarnIfShared(target, "loader") > 1) {
+            printf("replay data: %s is FOLDED with other functions, see above\n", Symbols_NameAt(target).c_str());
+        }
+    }
+
     printf("game version: %u\n", gameui::FindGameVersion());
 }
 
@@ -647,6 +681,9 @@ int DryRun(const std::wstring& gameDir, const std::wstring& plugin)
     }
     if (g_menuButtons) {
         printf("  [dry run] %d Esc-menu button(s)\n", g_menuButtons);
+    }
+    if (!g_replayKeys.empty() && !(gameui::svc.stopRecording && gameui::svc.requestReplayStart)) {
+        printf("  [dry run] WARNING: this game build lacks the replay names: its replay data is never saved\n");
     }
     if (g_guiCalls) {
         printf("  [dry run] %d GUI kit call(s) during init: there is no GUI yet (use GUI_LOADED)\n", g_guiCalls);

@@ -1,5 +1,5 @@
 // include/dk2ml.hpp against a fake API: binding resolution, required vs optional names, typed field/global/function
-// access, hooks, events, interfaces, tasks, the GUI wrappers, typed arguments and results.
+// access, hooks, events, interfaces, tasks, the GUI wrappers, replay data, typed arguments and results.
 #include "dk2ml.hpp"
 
 #include <cstdarg>
@@ -200,6 +200,28 @@ DK2ML_Status FakeAddMenuButton(const DK2ML_MenuButton* button)
     return DK2ML_OK;
 }
 
+DK2ML_ReplayData g_replayData = {}; // a copy: the wrapper's struct is gone after the call
+std::string g_replayKey;
+std::string g_replayBytes; // what ReplayWrite got
+size_t g_replayCap = 1000; // a fake cap, past which ReplayWrite fails
+int g_replaying = 0;
+
+DK2ML_Status FakeAddReplayData(const DK2ML_ReplayData* data)
+{
+    g_replayData = *data;
+    g_replayKey = data->key;
+    return DK2ML_OK;
+}
+
+DK2ML_Status FakeReplayWrite(DK2ML_ReplayWriter*, const void* data, size_t size)
+{
+    if (g_replayBytes.size() + size > g_replayCap) {
+        return DK2ML_ERROR;
+    }
+    g_replayBytes.append(static_cast<const char*>(data), size);
+    return DK2ML_OK;
+}
+
 DK2ML_API MakeApi()
 {
     DK2ML_API api = {};
@@ -222,6 +244,9 @@ DK2ML_API MakeApi()
     api.CaptureGameInput = FakeCapture;
     api.SubscribeGuiEvent = FakeSubscribeGui;
     api.AddMenuButton = FakeAddMenuButton;
+    api.AddReplayData = FakeAddReplayData;
+    api.ReplayWrite = FakeReplayWrite;
+    api.IsReplaying = []() { return g_replaying; };
     return api;
 }
 
@@ -332,6 +357,56 @@ void CheckGuiWrappers(const DK2ML_API* api)
            !dk2ml::gui::AddMenuButton(&old, b) && !g_menuButton && g_log.find("API 1") != std::string::npos);
 }
 
+void CheckReplayData(const DK2ML_API* api)
+{
+    void (*save)(DK2ML_ReplayWriter*, void*) = [](DK2ML_ReplayWriter*, void*) {};
+    void (*load)(const void*, size_t, void*) = [](const void*, size_t, void*) {};
+    int user = 0;
+    bool added = dk2ml::AddReplayData(api, "test.mod", save, load, &user);
+    Expect("AddReplayData hands the key and callbacks over",
+           added && g_replayKey == "test.mod" && g_replayData.structSize == sizeof(DK2ML_ReplayData) &&
+               g_replayData.save == save && g_replayData.load == load && g_replayData.user == &user);
+
+    DK2ML_API old = *api; // an API 2 loader: no replay fields
+    old.apiVersion = 2;
+    old.structSize = static_cast<uint32_t>(offsetof(DK2ML_API, AddReplayData));
+    old.AddReplayData = nullptr;
+    old.IsReplaying = nullptr;
+    g_log.clear();
+    Expect("AddReplayData on an API 2 loader: false and logged, never called",
+           !dk2ml::AddReplayData(&old, "test.old", save, load) && g_replayKey == "test.mod" &&
+               g_log.find("API 2") != std::string::npos);
+
+    g_replaying = 1;
+    Expect("IsReplaying, and false on an API 2 loader", dk2ml::IsReplaying(api) && !dk2ml::IsReplaying(&old));
+    g_replaying = 0;
+    Expect("IsReplaying false outside a replay", !dk2ml::IsReplaying(api));
+
+    dk2ml::ReplayOut out{api, nullptr};
+    bool wrote = out.Put<uint16_t>(1) && out.Put<int32_t>(-7) && out.Put<uint8_t>(1) && out.Bytes("ab", 2);
+    Expect("ReplayOut writes the values' bytes in order", wrote && out.Ok() && g_replayBytes.size() == 9);
+
+    dk2ml::ByteReader in{g_replayBytes.data(), g_replayBytes.size()};
+    uint16_t version = 0;
+    int32_t value = 0;
+    uint8_t on = 0;
+    char text[2] = {};
+    bool read = in.Get(&version) && in.Get(&value) && in.Get(&on) && in.Bytes(text, 2);
+    Expect("ByteReader reads them back",
+           read && version == 1 && value == -7 && on == 1 && text[0] == 'a' && text[1] == 'b' && in.Left() == 0);
+    uint32_t past = 42;
+    Expect("ByteReader past the end: false, nothing read", !in.Get(&past) && past == 42);
+
+    dk2ml::ByteReader none{nullptr, 5};
+    Expect("ByteReader on NULL data (no replay data): empty", none.Left() == 0 && !none.Get(&past));
+
+    dk2ml::ByteReader shortData{g_replayBytes.data(), 3};
+    Expect("ByteReader: a value cut short fails and stops", !shortData.Get(&value) && shortData.Left() == 0);
+
+    g_replayCap = g_replayBytes.size() + 2;
+    Expect("ReplayOut: a failed write sticks", !out.Put<uint32_t>(5) && !out.Ok() && !out.Put<uint8_t>(1));
+}
+
 void CheckTypedArguments()
 {
     uint64_t stack[8] = {};
@@ -380,6 +455,8 @@ int main()
     CheckInterfacesAndTasks(&api);
 
     CheckGuiWrappers(&api);
+
+    CheckReplayData(&api);
 
     CheckTypedArguments();
 

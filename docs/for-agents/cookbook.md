@@ -171,6 +171,70 @@ if (auto* m = dk2ml::Get<MyModApi>(api, "author.mymod.Api", 1)) m->SetZoom(2.0f)
 ```
 Naming and lifetime rules: [api-map.md](api-map.md#interfaces).
 
+## Repeat a plugin's state in replays
+`AddReplayData` (API 3) in init. Record each change with its game time while playing; the loader asks for the bytes when
+the game writes the replay and hands them back when it plays. While replaying, work the state out from the start at
+the current game time, so skipping back undoes later changes:
+```cpp
+dk2ml::Global<void*> g_pGameClient{"g_pGameClient"};
+dk2ml::Field<int> GameCommon_m_gameTime{"GameCommon", "m_gameTime"}; // ms
+
+struct Change { int32_t timeMs; uint8_t on; };
+bool g_startOn = false;            // at mission start (reset in MAP_LOADED)
+std::vector<Change> g_changes;     // this mission, in game-time order
+bool g_replayStartOn = false;      // the replay being watched
+std::vector<Change> g_replayChanges;
+
+void SetOn(bool on) // the player's switch, in a mission
+{
+    if (void* client = *g_pGameClient) g_changes.push_back({GameCommon_m_gameTime(client), on ? uint8_t(1) : uint8_t(0)});
+}
+
+bool On() // in play or in a replay
+{
+    void* client = *g_pGameClient;
+    const bool replaying = dk2ml::IsReplaying(api);
+    bool on = replaying ? g_replayStartOn : g_startOn;
+    for (const Change& c : replaying ? g_replayChanges : g_changes) {
+        if (client && c.timeMs > GameCommon_m_gameTime(client)) break;
+        on = c.on != 0;
+    }
+    return on;
+}
+
+void SaveReplay(DK2ML_ReplayWriter* out, void*)
+{
+    dk2ml::ReplayOut w{api, out};
+    w.Put<uint16_t>(1); // this format's version
+    w.Put<uint8_t>(g_startOn ? 1 : 0);
+    w.Put<uint32_t>(static_cast<uint32_t>(g_changes.size()));
+    for (const Change& c : g_changes) { w.Put(c.timeMs); w.Put(c.on); }
+}
+
+void LoadReplay(const void* data, size_t size, void*)
+{
+    g_replayStartOn = false; // none, or a version this one doesn't know: the defaults
+    g_replayChanges.clear();
+    dk2ml::ByteReader r{data, size};
+    uint16_t version = 0;
+    uint8_t startOn = 0;
+    uint32_t count = 0;
+    if (!r.Get(&version) || version != 1 || !r.Get(&startOn) || !r.Get(&count)) return;
+    for (uint32_t i = 0; i < count; ++i) {
+        Change c;
+        if (!r.Get(&c.timeMs) || !r.Get(&c.on)) { g_replayChanges.clear(); return; }
+        g_replayChanges.push_back(c);
+    }
+    g_replayStartOn = startOn != 0;
+}
+
+// in DK2ML_PluginInit (R11)
+dk2ml::AddReplayData(api, "author.mymod", SaveReplay, LoadReplay);
+```
+`LoadReplay` reads bytes that may come from another player's file, so it checks every read and keeps nothing on a
+failure. Declare `DK2ML_PLUGIN_MANIFEST(3, ...)`, or check the result: on an older loader `AddReplayData` returns false, and
+replays show the defaults. Rules: [api-map.md](api-map.md#replays).
+
 ## Debug with Visual Studio
 1. `.\tools\build.ps1 -Config RelWithDebInfo`, then install.
 2. The human starts the game and attaches: Visual Studio > Debug > Attach to Process > `DoorKickers2.exe` (R23). Breakpoints in the plugin bind once it's loaded, and game frames have names from the game's PDB.

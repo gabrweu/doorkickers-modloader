@@ -132,6 +132,14 @@ struct ServiceNames {
     void (*RegisterConsumer)(void* eventSystem, void* consumer, unsigned eventId);
     int64_t guiEventCount; // eEventType::NUM_VALUES
     void* onWindowResized;
+
+    // replay data (hooked if a plugin adds some) and IsReplaying
+    void* stopRecording;      // Replay::StopRecording(bool): writes last_replay_N.rpl; a no-op when nothing records
+    void* requestReplayStart; // GameClient::RequestReplayStart(this, const char* path, bool)
+    int32_t clientFlags;      // GameClient::m_flags (-1: unknown)
+    int64_t flagReplaying;    // CGAMEFLAG_REPLAYING (0: unknown)
+
+    void* printTextVarg; // Render2D::PrintText_varg: hooked to add the loader version to the game's version label
 };
 
 // The game's active mod list, edited on every Mods-menu click (Mods::SetModAsActive). See Plugins_SyncEnabled.
@@ -163,6 +171,8 @@ bool ResolveKit();
 void ResolveServices();
 // From the save functions' code: no game variable holds it. 0 if not found.
 uint32_t FindGameVersion();
+// Return address of RenderStats' PrintText_varg(..., "v%s", "1.12") call (the menus' version label). 0 if not found.
+uintptr_t FindVersionLabelCall();
 
 // The Modloader button and screen (needs Symbols_Init). False: no screen; plugins unaffected.
 bool Resolve();

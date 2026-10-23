@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(dk2ml VERSION 1.1.0 LANGUAGES C CXX ASM_MASM RC)
+project(dk2ml VERSION 1.2.0 LANGUAGES C CXX ASM_MASM RC)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,6 +51,7 @@ add_library(dk2ml SHARED
     loader/plugins/Events.cpp
     loader/plugins/Interfaces.cpp
     loader/plugins/GameHooks.cpp
+    loader/plugins/Replays.cpp
     # the game's GUI: the loader's button and screen, the GUI kit
     loader/gui/GameUi.cpp
     loader/gui/nativemods/NativeModsButton.cpp
@@ -72,7 +73,7 @@ target_compile_definitions(dk2ml PRIVATE UNICODE _UNICODE)
 # PDB explorer and plugin dry run (shipped in the template zip's tools\)
 add_executable(symtest tools/SymTest.cpp loader/core/Symbols.cpp loader/core/Log.cpp loader/proxy/RealDbgHelp.cpp
     loader/gui/GameUi.cpp loader/plugins/OptionCheck.cpp loader/plugins/Events.cpp loader/plugins/Interfaces.cpp
-    loader/safety/Consent.cpp loader/gui/menubuttons/MenuButtonsXml.cpp
+    loader/plugins/Replays.cpp loader/safety/Consent.cpp loader/gui/menubuttons/MenuButtonsXml.cpp
     loader/gui/nativemods/NativeModsScreenXml.cpp)
 target_include_directories(symtest PRIVATE include loader)
 target_link_libraries(symtest PRIVATE psapi bcrypt shell32 user32)
@@ -123,6 +124,12 @@ add_executable(eventstest tests/EventsTest.cpp loader/plugins/Events.cpp loader/
 target_include_directories(eventstest PRIVATE include loader)
 target_compile_definitions(eventstest PRIVATE UNICODE _UNICODE)
 
+# replay data (the block in the file, save/load around StopRecording and RequestReplayStart, crash containment) on
+# files in a temporary folder
+add_executable(replaystest tests/ReplaysTest.cpp loader/plugins/Replays.cpp loader/core/Log.cpp)
+target_include_directories(replaystest PRIVATE include loader)
+target_compile_definitions(replaystest PRIVATE UNICODE _UNICODE)
+
 # GUI callback thunks (crash containment, sharing, input capture) with fake actions
 add_executable(guitest tests/GuiTest.cpp loader/gui/GuiThunks.cpp loader/core/Log.cpp)
 target_include_directories(guitest PRIVATE include loader)
@@ -144,6 +151,6 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/CrashPlugin.cpp)
 endif()
 
 # ctest --test-dir build runs these; symtest needs the game
-foreach(test hooktest consenttest screentest hpptest eventstest crashtest guitest)
+foreach(test hooktest consenttest screentest hpptest eventstest replaystest crashtest guitest)
     add_test(NAME ${test} COMMAND ${test} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endforeach()

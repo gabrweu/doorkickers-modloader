@@ -33,7 +33,7 @@ The default game folder is `C:\Program Files (x86)\Steam\steamapps\common\DoorKi
 3. Check every game name with `symtest` before using it (R3).
 4. Bindings (`dk2ml::Fn/Global/Field/TypeSize/Enum`) at namespace scope, then `dk2ml::ResolveAll(api)` in init (R4).
 5. Game functions, the GUI kit and ImGui only on the main thread. No game objects or GUI during init (R5, R12).
-6. `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface` and `AddMenuButton` only inside `DK2ML_PluginInit` (R11).
+6. `AddOption`, `Subscribe`, `SubscribeGuiEvent`, `PublishInterface`, `AddMenuButton` and `AddReplayData` only inside `DK2ML_PluginInit` (R11).
 7. Save files only under `api->GetConfigDir()`, never in the mod folder (R16).
 8. Prefer loader events to hooks. Filter hooks by `this` (R6, R9).
 9. A change is done only when the dry run passes (R22). In-game behavior is unverified until the human tests it.

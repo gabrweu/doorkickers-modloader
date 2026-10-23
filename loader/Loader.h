@@ -286,6 +286,38 @@ void Interfaces_FaultOwner(HMODULE owner); // GetInterface stops returning its t
 void Interfaces_Of(HMODULE owner, std::vector<std::string>* published, std::vector<std::string>* used);
 void Interfaces_Log();
 
+// --- Replays.cpp ---
+// AddReplayData: plugins' data in the game's replay files, one block after the game's chunks. Fed by GameHooks.cpp
+// (userDir: Plugins_SaveDir). Touches files, not the game (replaystest).
+struct ReplaySection {
+    std::string key;
+    std::vector<uint8_t> data;
+};
+
+void Replays_SetOpen(bool open); // only during plugin init
+void Replays_SetCrashCallback(void (*onCrash)(HMODULE owner)); // switches the plugin off
+const char* Replays_Check(const DK2ML_ReplayData* data); // nullptr if valid, else why not (not the key's uniqueness)
+DK2ML_Status Replays_Add(HMODULE owner, const DK2ML_ReplayData* data);
+DK2ML_Status Replays_Write(HMODULE caller, DK2ML_ReplayWriter* out, const void* data, size_t size);
+bool Replays_Wanted(); // a plugin that's still on added replay data
+void Replays_FaultOwner(HMODULE owner); // its callbacks don't run any more
+void Replays_Log(); // the keys of plugins still on
+
+bool Replays_ReadBlock(const std::wstring& path, std::vector<ReplaySection>* sections); // false: none or damaged
+bool Replays_AppendBlock(const std::wstring& path, const std::vector<ReplaySection>& sections);
+// The game's replay path as given, or under userDir or its replays\ (UTF-8, else the ANSI code page); "" if not found
+std::wstring Replays_Resolve(const std::wstring& userDir, const char* path);
+std::vector<ReplaySection> Replays_Save(); // every plugin's save; empty ones left out
+void Replays_Load(const std::vector<ReplaySection>& sections); // every plugin's load; NULL for keys not in sections
+
+// The hooks: Replay::StopRecording writes userDir\replays\last_replay_N.rpl; GameClient::RequestReplayStart plays path
+// (nested: watching right after a mission). A start without data loads NULL in its post, after any nested save. A
+// crash in the loader's own code here turns replay data off for the session.
+void Replays_OnStopRecordingPre(const std::wstring& userDir);
+void Replays_OnStopRecordingPost(const std::wstring& userDir);
+void Replays_OnReplayStartPre(const std::wstring& userDir, const char* path);
+void Replays_OnReplayStartPost();
+
 // --- CrashReport.cpp ---
 // <game>\dk2ml-crash-<time>.log for an unhandled exception, from CreateMiniDump before the game's dump. Dying process:
 // no heap, never waits on a lock.
@@ -353,11 +385,12 @@ DK2ML_Status Gui_Click(void* item);
 DK2ML_Status Gui_SetCallback(HMODULE owner, void* item, int itemEvent, DK2ML_GuiCallbackFn fn, void* user);
 
 // --- GameHooks.cpp ---
-// The loader's own game hooks (frame tick, GUI load, map load, input capture, resize), owned by the loader.
+// The loader's own game hooks (frame tick, GUI load, map load, input capture, resize, replays), owned by the loader.
 void GameHooks_Init();
 bool GameHooks_Install(void* target, DK2ML_PreFn pre, DK2ML_PostFn post, const char* what); // logs a failure
 int64_t GameHooks_GameState(void** gameClient); // GameClient::m_state (-1: unknown), and the GameClient
 int GameHooks_IsGameMenuOpen(); // GameGUI::IsAnyMenuOpened without plugins' captures (0 if unknown)
+int GameHooks_IsReplaying(); // GameClient::m_flags has CGAMEFLAG_REPLAYING (0 if unknown)
 
 // --- gui/nativemods/NativeModsButton.cpp ---
 // The main-menu Modloader button and screen, merged into the GUI as it loads
